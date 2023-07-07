@@ -138,25 +138,6 @@ calc_patm <- function(elv, patm0 = 101325){
 ```
 
 
-```{r eval = FALSE}
-# Path for WorldClim data
-path_worldclim <- "~/data/archive/worldclim_fick_2017/data"
-
-# Read the temperature data for January (already in Celsius)
-temp_worldclim <- terra::rast(paste0(path_worldclim, "/wc2.1_30s_tavg_01.tif"))
-
-# Plot average
-ggplot() +
-  tidyterra::geom_spatraster(data = temp_worldclim) +
-  scale_fill_viridis_c(
-    na.value = NA,
-    name = "Temperature (C) \n"
-    ) +
-  theme_bw() +
-  theme(
-    legend.position = "bottom"
-    )
-```
 
 ```{r eval = FALSE}
 # Transform the WATCH-WFDEI raster to match the grid from WorldClim
