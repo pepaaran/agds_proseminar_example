@@ -1,0 +1,74 @@
+---
+title: "Reading and processing WATCH-WFDEI data"
+author: "Pepa Aran"
+date: "2023-07-07"
+output: html_document
+---
+
+```{r, setup, include=FALSE}
+knitr::opts_knit$set(root.dir = here::here())
+
+library(dplyr)
+library(stringr)
+library(terra)
+library(ggplot2)
+library(tidyterra)
+```
+
+WATCH-WFDEI provides monthly climate fields at 0.5 degree resolution from 1979 to 2012. 
+The data can be downloaded from the IIASA website via ftp for each variable separately:
+- **Tair** is the daily average (of 3-hourly) near surface air temperature (in Kelvin) at 2m at time stamp.
+- **Qair** is the daily average specific humidity (in kg/kg) at 2m above surface
+
+
+After downloading the data from the IIASA website via ftp, we can read the netCDF files and extract the information we're interested in. For example, `Tair_daily_WFDEI_197901.nc` contains average temperature values for each day of January 1979 and each pixel in a 0.5 degree grid covering the whole globe. Therefore, to get the time series of temperature for a given pixel
+
+Let's start by reading the data for the month of January 1979 only.
+```{r}
+# Path for WATCH-WFDEI data (directory containing the .nc files)
+path_watch <- "~/data/archive/wfdei_weedon_2014/data/Tair_daily"
+
+# Get the list of .nc files in the directory
+file_list <- list.files(path_watch, pattern = "*.nc", full.names = TRUE)
+
+# Read the temperature data for January, K -> C
+temp_watch <- terra::rast(file_list[1]) - 273.15
+
+# Plot month average
+ggplot() +
+  tidyterra::geom_spatraster(data = temp_watch |>
+                               terra::app(mean, na.rm = TRUE)) +
+  scale_fill_viridis_c(
+    na.value = NA,
+    name = "Temperature (C) \n"
+    ) +
+  theme_bw() +
+  theme(
+    legend.position = "bottom"
+    )
+```
+
+Now let's read the specific humidity data, as we did for temperature.
+```{r}
+# Path for WATCH-WFDEI data (directory containing the .nc files)
+path_watch_qair <- "~/data/archive/wfdei_weedon_2014/data/Qair_daily"
+
+# Get the list of .nc files in the directory
+file_list_qair <- list.files(path_watch_qair, pattern = "*.nc", full.names = TRUE)
+
+# Read the specific humidity data for January 1979
+qair_watch <- terra::rast(file_list_qair[1])
+
+# Plot month average
+ggplot() +
+  tidyterra::geom_spatraster(data = qair_watch |>
+                               terra::app(mean, na.rm = TRUE)) +
+  scale_fill_viridis_c(
+    na.value = NA,
+    name = "Specific humidity (kg/kg) \n"
+    ) +
+  theme_bw() +
+  theme(
+    legend.position = "bottom"
+    )
+```

@@ -1,0 +1,254 @@
+---
+title: "Downscaling VPD and temperature data"
+author: "Pepa Arán"
+output: rmarkdown::html_vignette
+---
+
+```{r, setup, include=FALSE}
+knitr::opts_knit$set(root.dir = here::here())
+
+library(dplyr)
+library(stringr)
+library(terra)
+library(ggplot2)
+library(tidyterra)
+```
+
+This report presents an Applied Geo-Data Science project aimed at spatially downscaling daily Vapor Pressure Deficit (VPD) and temperature values to address vegetation modelling questions. By improving the spatial resolution of climatic data, we can gain valuable insights into the relationships between environmental variables and vegetation dynamics at finer scales. 
+
+This project proposes the integration of daily meteorological data from the WATCH-WFDEI dataset with a finer spatial grid dataset like Worldclim, which provides averaged values over 30 years, to achieve higher spatial resolution. Average daily temperature data is directly provided in both datasets and we will use measurements of specific humidity from WATCH-WFDEI and vapour pressure from Worldclim to compute VPD. A simple de-biasing technique will be employed to combine the two datasets effectively. Finally, the quality of the downscaling will be evaluated through various means, including visualization and comparison with temperature and VPD measurements from FLUXNET2015 sites.
+ 
+# Reading the raw data
+
+Instead of getting the global map, we will first implement the procedure for the gird cells corresponding to the swiss FLUXNET2015 sites.
+
+```{r}
+# Load location information about the Flux sites
+load("data/siteinfo_fluxnet2015.rda")
+
+# Select the swiss sites only
+swiss_sites <- siteinfo_fluxnet2015 |>
+  filter(str_starts(sitename, "CH")) |>
+  select(sitename, lon, lat, elv, year_start, year_end, plant_functional_type)
+
+swiss_sites
+```
+
+
+## Read daily data from WATCH-WFDEI
+
+WATCH-WFDEI provides monthly climate fields at 0.5 degree resolution from 1979 to 2012. 
+The data can be downloaded from the IIASA website via ftp for each variable separately:
+- **Tair** is the daily average (of 3-hourly) near surface air temperature (in Kelvin) at 2m at time stamp.
+- **Qair** is
+
+
+After downloading the data from the IIASA website via ftp, we can read the netCDF files and extract the information we're interested in. For example, `Tair_daily_WFDEI_197901.nc` contains average temperature values for each day of January 1979 and each pixel in a 0.5 degree grid covering the whole globe. Therefore, to get the time series of temperature for a given pixel
+
+```{r eval = FALSE}
+
+# Set the path to the directory containing the .nc files
+path_watch <- "~/data/archive/wfdei_weedon_2014/data/Tair_daily"
+
+# Get the list of .nc files in the directory
+file_list <- list.files(path_watch, pattern = "*.nc", full.names = TRUE)
+
+# Define function to get average monthly temperature
+get_monthly_average <- function(file, var){
+  # file: full path of the .nc file
+  # var: variable saved in the raster, either "temperature" or "vpd"
+  
+ 
+  
+  if(var == "temperature"){
+    # Read file and convert Kelvin -> Celsius
+    rasta <- terra::rast(file) - 273.15 
+  }else if(var == "vpd"){
+    # Read file
+    rasta <- terra::rast(file)
+    # Calculate VPD from Qair (specific humidity)
+    
+  }
+  # Compute mean monthly values and return raster layer
+  terra::app(rasta, mean, na.rm = TRUE)
+}
+
+lapply(file_list, get_monthly)
+
+# Get average monthly temperature
+temp_avg <- terra::app(temp, mean, na.rm = TRUE)
+
+# Plot average monthly temperature in January 1979
+ggplot() +
+  tidyterra::geom_spatraster(data = temp_avg) +
+  scale_fill_viridis_c(
+    na.value = NA,
+    name = "Temperature (C) \n"
+    ) +
+  theme_bw() +
+  theme(
+    legend.position = "bottom"
+    )
+```
+
+WATCH-WFDEI does not provide vapor pressure deficit (VPD) values directly, therefore we need to calculate them from the variables that are available. We can use the following formula:
+
+$ VPD = 0.611 \exp[ (17.27 tc)/(tc + 237.3) ] - ea$ 
+             vpd = 0.611*exp[ (17.27 tc)/(tc + 237.3) ] - ea
+             where:
+                 tc = average daily air temperature, deg C
+                 eact  = actual vapor pressure, Pa
+  
+  
+>  Ref: Eq. 5.1, Abtew and Meleese (2013), Ch. 5 Vapor Pressure Calculation Methods, in Evaporation and Evapotranspiration: Measurements and Estimations, Springer, London.
+
+```{r eval = FALSE}
+# Define functions to compute VPD
+calc_vpd_from_qair <- function(qair, elv, patm0 = 101325){
+  
+  # Calculate atmospheric pressure
+  patm <- calc_patm(elv, patm0)
+  
+  # Define constants
+  kR  = 8.3143   # universal gas constant, J/mol/K (Allen, 1973)
+  kMv = 18.02    # molecular weight of water vapor, g/mol (Tsilingiris, 2008)
+  kMa = 28.963   # molecular weight of dry air, g/mol (Tsilingiris, 2008)
+    
+  ## calculate the mass mixing ratio of water vapor to dry air (dimensionless)
+  wair <- qair / (1 - qair)
+  
+  ## calculate water vapor pressure 
+  rv <- kR / kMv
+  rd <- kR / kMa
+  eact = patm * wair * rv / (rd + wair * rv)
+}
+
+
+calc_patm <- function(elv, patm0 = 101325){
+  # Define constants
+  kTo <- 298.15    # base temperature, K (Prentice, unpublished)
+  kL  <- 0.0065    # adiabiatic temperature lapse rate, K/m (Allen, 1973)
+  kG  <- 9.80665   # gravitational acceleration, m/s^2 (Allen, 1973)
+  kR  <- 8.3145    # universal gas constant, J/mol/K (Allen, 1973)
+  kMa <- 0.028963  # molecular weight of dry air, kg/mol (Tsilingiris, 2008)
+  
+  # Convert elevation to pressure, Pa:
+  patm0*(1.0 - kL*elv/kTo)^(kG*kMa/(kR*kL))
+}
+```
+
+
+```{r eval = FALSE}
+# Path for WorldClim data
+path_worldclim <- "~/data/archive/worldclim_fick_2017/data"
+
+# Read the temperature data for January (already in Celsius)
+temp_worldclim <- terra::rast(paste0(path_worldclim, "/wc2.1_30s_tavg_01.tif"))
+
+# Plot average
+ggplot() +
+  tidyterra::geom_spatraster(data = temp_worldclim) +
+  scale_fill_viridis_c(
+    na.value = NA,
+    name = "Temperature (C) \n"
+    ) +
+  theme_bw() +
+  theme(
+    legend.position = "bottom"
+    )
+```
+
+```{r eval = FALSE}
+# Transform the WATCH-WFDEI raster to match the grid from WorldClim
+temp_finer <- resample(temp_avg, temp_worldclim, method = "near")
+
+# Substract the bias from the measured temperature
+```
+
+
+```{r eval = FALSE}
+# Load libraries to read data
+library(ncdf4)
+
+# Set the path to the directory containing the .nc files
+data_dir <- "~/data/archive/wfdei_weedon_2014/data/Tair_daily/"
+
+# Get the list of .nc files in the directory
+file_list <- list.files(data_dir, pattern = "*.nc", full.names = TRUE)
+
+# Loop through each .nc file
+for (file in file_list) {
+  # Open the raster file
+  nc_data <- nc_open(file)
+  
+  # Extract the necessary variables (e.g., VPD and temperature)
+  
+  temperature <- ncvar_get(nc_data, "Tair")
+  # Note that NAs are given for ocean surface
+  
+  temperature <- ncvar_get(nc_data, "temperature")
+  
+  # Do further processing or analysis with the extracted variables
+  
+  # Close the .nc file
+  nc_close(nc_data)
+}
+
+```
+
+## Read monthly average climatology from WorldClim
+
+The WorldClim dataset represents average monthly climate data for 1970-2000.
+
+
+# VPD downscaling 
+
+
+## Get coordinates for the map of Switzreland
+
+Because of the long processing time, we will only focus on the area of Switzerland. Let's obtain the coordinates for the swiss map.
+```{r eval = FALSE}
+#CODE FROM CHAT-GPT
+
+library(maps)
+library(rnaturalearth)
+library(rnaturalearthdata)
+
+# Get the map data for Switzerland
+switzerland_map <- ne_countries(scale = "medium", country = "Switzerland", returnclass = "sf")
+
+# Extract the coordinates for Switzerland
+switzerland_coords <- switzerland_map$geometry[[1]]$coords
+
+# Print the coordinates
+print(switzerland_coords)
+
+library(sp)
+
+# Assuming you have the vector object 'switzerland_coords' containing the coordinates of Switzerland
+
+# Create an empty spatial grid object
+grid <- GridTopology(cellcentre.offset = c(min(switzerland_coords[, 1]), min(switzerland_coords[, 2])),
+                     cellsize = c(0.1, 0.1),
+                     cells.dim = c(100, 100))
+
+# Convert the grid to a SpatialPixels object
+spatial_grid <- SpatialPixels(grid, proj4string = CRS("+proj=longlat +datum=WGS84"))
+
+# Convert the SpatialPixels object to a SpatialGridDataFrame
+grid_df <- SpatialGridDataFrame(spatial_grid, data = data.frame(ID = 1:length(spatial_grid)))
+
+# Set the projection information for the grid based on the original vector object
+proj4string(grid_df) <- CRS("+proj=longlat +datum=WGS84")
+
+# Crop the grid to the extent of Switzerland
+grid_df_cropped <- crop(grid_df, switzerland_coords)
+
+# Print the resulting spatial grid object
+print(grid_df_cropped)
+
+```
+
+
+
+

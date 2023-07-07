@@ -1,0 +1,89 @@
+---
+title: "Reading and processing Worldclim data"
+author: "Pepa Aran"
+date: "2023-07-07"
+output: html_document
+---
+
+```{r, setup, include=FALSE}
+knitr::opts_knit$set(root.dir = here::here())
+
+library(dplyr)
+library(stringr)
+library(terra)
+library(ggplot2)
+library(tidyterra)
+```
+
+The 30sec gridded data from WorldClim can be directly downloaded from https://www.worldclim.org/data/worldclim21.html. We are interested in the following variables:
+
+- **tavg**: average monthly temperature ($^\text{o}$C)
+- **vapr**: water vapor pressure (kPa)
+- **elev**: elevation
+
+Let's take a look at the average temperature across the globe in January, between the years 1970-2000.
+```{r}
+# Path for WorldClim data
+path_worldclim <- "~/data/archive/worldclim_fick_2017/data"
+
+# Read the temperature data for January
+temp_worldclim <- terra::rast(paste0(path_worldclim, "/wc2.1_30s_tavg_01.tif"))
+
+# Plot average
+ggplot() +
+  tidyterra::geom_spatraster(data = temp_worldclim) +
+  scale_fill_viridis_c(
+    na.value = NA,
+    name = "Temperature (C) \n"
+    ) +
+  theme_bw() +
+  theme(
+    legend.position = "bottom"
+    )
+```
+
+We can also observe the values for water vapor pressure, for the same time and locations. Since we will work with Pa, we need to do a unit transformation when reading the data.
+```{r}
+# Path for WorldClim data
+path_worldclim <- "~/data/archive/worldclim_fick_2017/data"
+
+# Read the water vapor pressure data for January, kPa -> Pa
+vapr_worldclim <- terra::rast(paste0(path_worldclim, "/wc2.1_30s_vapr_01.tif")) * 1000
+
+# Plot average
+ggplot() +
+  tidyterra::geom_spatraster(data = vapr_worldclim) +
+  scale_fill_viridis_c(
+    na.value = NA,
+    name = "Water Vapor Pressure (Pa) \n"
+    ) +
+  theme_bw() +
+  theme(
+    legend.position = "bottom"
+    )
+```
+
+From the water vapor pressure and temperature, we can easily compute our variable of interest VPD (vapor pressure deficit) as follows:
+
+$$ VPD = 0.611 \exp \left({\frac{17.27 T}{T + 237.3}} \right) - P $$
+
+where $T$ stands for temperature and $P$ for water vapor pressure.
+
+```{r}
+# Define function to compute VPD
+calc_vpd_from_vapr <- function(values){
+  # Use the raster layers as a vector
+    tc <- values[1]       # temperature in C
+    vapr <- values[2]     # water vapor pressure in Pa
+  
+  # Calculate VPD
+  611.0 * exp( (17.27 * tc)/(tc + 237.3) ) - vapr
+}
+
+# Compute VPD from the WorldClim data
+vpd_worlclim <- c(temp_worldclim, vapr_worldclim) |>
+  terra::app(calc_vpd_from_vapr)
+
+```
+
+
