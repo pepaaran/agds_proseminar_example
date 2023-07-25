@@ -1,0 +1,167 @@
+---
+title: "Combine datasets for Switzerland"
+author: "Pepa Aran"
+date: "2023-07-24"
+output: html_document
+---
+
+```{r, setup, include=FALSE}
+knitr::opts_knit$set(root.dir = here::here())
+
+library(dplyr)
+library(stringr)
+library(terra)
+library(ggplot2)
+library(tidyterra)
+library(maps)
+library(rnaturalearth)
+library(rnaturalearthdata)
+```
+
+# Combining datasets for the swiss territory
+
+Since the WorldClim data is too heavy to process locally, we will crop the global maps and work with the territory covering Switzerland only. 
+
+We start by loading the WorldClim data and saving the cropped files.
+```{r}
+# Path for WorldClim data
+path_worldclim <- "~/data/archive/worldclim_fick_2017/data"
+
+# Read the temperature data for January
+temp_worldclim <- terra::rast(paste0(path_worldclim, "/wc2.1_30s_tavg_01.tif"))
+
+# Get the map data for Switzerland
+switzerland_map <- ne_countries(scale = "medium", country = "Switzerland", returnclass = "sf")
+
+# Crop approximately the area of Switzerland
+temp_worldclim <- terra::crop(x = temp_worldclim,
+                              y = vect(switzerland_map))
+
+# Plot average January temperature in Switzerland
+ggplot() +
+  tidyterra::geom_spatraster(data = temp_worldclim) +
+  scale_fill_viridis_c(
+    na.value = NA,
+    name = "Temperature (C) \n"
+    ) +
+  theme_bw() +
+  theme(
+    legend.position = "bottom"
+    )
+```
+
+We can repeat the exercise for the WATCH-WFDEI data and appreciate the difference in resolution. 
+```{r}
+# Path for WATCH-WFDEI data (directory containing the .nc files)
+path_watch <- "~/data/archive/wfdei_weedon_2014/data/Tair_daily"
+
+# Get the list of .nc files in the directory
+file_list <- list.files(path_watch, pattern = "*.nc", full.names = TRUE)
+
+# Read the temperature data for January 1979, K -> C
+temp_watch <- terra::rast(file_list[1]) - 273.15
+
+# Crop approximately the area of Switzerland for all daily data
+temp_watch <- terra::crop(x = temp_watch,
+                              y = vect(switzerland_map))
+
+# Plot month average
+ggplot() +
+  tidyterra::geom_spatraster(data = temp_watch |>
+                               terra::app(mean, na.rm = TRUE)) +
+  scale_fill_viridis_c(
+    na.value = NA,
+    name = "Temperature (C) \n"
+    ) +
+  theme_bw() +
+  theme(
+    legend.position = "bottom"
+    )
+```
+
+In the next code chunk, we read all WorldClim files, crop the data, compute VPD and save the resulting raster.
+```{r}
+# Define function to compute VPD
+calc_vpd_from_vapr <- function(values){
+  # Use the raster layers as a vector
+    tc <- values[1]       # temperature in C
+    vapr <- values[2]     # water vapor pressure in Pa
+  
+  # Calculate VPD
+  611.0 * exp( (17.27 * tc)/(tc + 237.3) ) - vapr
+}
+
+process_worldclim <- function(
+    data_path,   # path for WorldClim data
+    month,       # month number in character, e.g. "01"
+    crop_map,    # map from rnaturalearth to crop global map
+    filename,    # name for the output file
+    cores        # number of cores for parallel computation
+){
+  # Read temperature data and crop
+  path_temp <- paste0(data_path, "/wc2.1_30s_tavg_", month, ".tif")
+  temp_worldclim <- terra::rast(path_temp) |>
+    terra::crop(vect(crop_map))
+  
+  # Read water vapor pressure data and crop
+  path_vapr <- paste0(data_path, "/wc2.1_30s_vapr_", month, ".tif")
+  vapr_worldclim <- terra::rast(path_vapr) |>
+    terra::crop(vect(crop_map))
+  
+  # Compute VPD from the WorldClim data
+  # vpd_worldclim <- c(temp_worldclim, vapr_worldclim) |>
+  #   terra::app(calc_vpd_from_vapr)
+  vpd_worldclim <- c(temp_worldclim, vapr_worldclim) |>
+    terra::app(fun = function(i, ff) ff(i),
+               cores = cores,
+               ff = calc_vpd_from_vapr,        # must export function to the nodes
+               filename = filename,
+               overwrite = TRUE)  
+  
+  # Return a single raster with two layers
+  terra::add(temp_worldclim) <- vpd_worldclim
+  names(temp_worldclim) <- paste0(c("tavg_", "vpd_"), month)
+  temp_worldclim
+}
+
+# Process data for all 12 months
+for(m in c(paste0("0", 1:9), "10", "11", "12")){
+  process_worldclim(
+    data_path = "~/data/archive/worldclim_fick_2017/data",
+    month = m,
+    crop_map = ne_countries(scale = "medium", country = "Switzerland", returnclass = "sf"),
+    filename = paste0("data/wc2.1_30s_CH_tavg_vpd_", m, ".tif"),
+    cores = 1
+  )
+}
+```
+
+Finally, let's plot the data. To make it easier, we will define a function that we can reuse which uses the data saved in files.
+```{r}
+# Function that plots data in file
+plot_worldclim <- function(filename, layer_name){
+  # Read file
+  r <- terra::rast(filename)
+  
+  # Define plot legend
+  name_legend <- ifelse(grepl("tavg",layer_name),
+                        "Temperature (C) \n",
+                        "Vapor Pressure Deficit (Pa) \n")
+  
+  ggplot() +
+  tidyterra::geom_spatraster(data = r[[layer_name]] ) +
+  scale_fill_viridis_c(
+    na.value = NA,
+    name = name_legend
+    ) +
+  theme_bw() +
+  theme(
+    legend.position = "bottom"
+    )
+}
+
+plot_worldclim("data/wc2.1_30s_CH_tavg_vpd_08.tif",
+               layer_name = "lyr.1")
+```
+
+

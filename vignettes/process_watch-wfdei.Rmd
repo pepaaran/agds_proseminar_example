@@ -19,7 +19,7 @@ WATCH-WFDEI provides monthly climate fields at 0.5 degree resolution from 1979 t
 The data can be downloaded from the IIASA website via ftp for each variable separately:
 - **Tair** is the daily average (of 3-hourly) near surface air temperature (in Kelvin) at 2m at time stamp.
 - **Qair** is the daily average specific humidity (in kg/kg) at 2m above surface
-
+- **PSurf** is the daily average surface pressure (in hPa) 
 
 After downloading the data from the IIASA website via ftp, we can read the netCDF files and extract the information we're interested in. For example, `Tair_daily_WFDEI_197901.nc` contains average temperature values for each day of January 1979 and each pixel in a 0.5 degree grid covering the whole globe. Therefore, to get the time series of temperature for a given pixel
 
@@ -48,16 +48,19 @@ ggplot() +
     )
 ```
 
-Now let's read the specific humidity data, as we did for temperature.
+Now let's read the specific humidity and surface pressure data, as we did for temperature.
 ```{r}
 # Path for WATCH-WFDEI data (directory containing the .nc files)
 path_watch_qair <- "~/data/archive/wfdei_weedon_2014/data/Qair_daily"
+path_watch_psurf <- "~/data/archive/wfdei_weedon_2014/data/PSurf_daily"
 
 # Get the list of .nc files in the directory
 file_list_qair <- list.files(path_watch_qair, pattern = "*.nc", full.names = TRUE)
+file_list_psurf <- list.files(path_watch_psurf, pattern = "*.nc", full.names = TRUE)
 
-# Read the specific humidity data for January 1979
+# Read the data for January 1979
 qair_watch <- terra::rast(file_list_qair[1])
+psurf_watch <- terra::rast(file_list_psurf[1]) * 100   # hPa -> Pa
 
 # Plot month average
 ggplot() +
@@ -71,4 +74,91 @@ ggplot() +
   theme(
     legend.position = "bottom"
     )
+
+ggplot() +
+  tidyterra::geom_spatraster(data = psurf_watch |>
+                               terra::app(mean, na.rm = TRUE)) +
+  scale_fill_viridis_c(
+    na.value = NA,
+    name = "Surface pressure (Pa) \n"
+    ) +
+  theme_bw() +
+  theme(
+    legend.position = "bottom"
+    )
 ```
+
+As we did for the WorldClim data, we can compute VPD (vapor pressure deficit) from the specific humidity, elevation and temperature data provided in WATCH-WFDEI:
+
+$$ VPD = 0.611 \exp \left({\frac{17.27 T}{T + 237.3}} \right) - P $$
+
+where $T$ stands for temperature and $P$ for water vapor pressure.
+
+```{r}
+# Define function to compute VPD
+calc_vpd_from_qair <- function(values){
+  # Use the raster layers as a vector
+    tc <- values[1]       # temperature in C
+    qair <- values[2]     # specific humidity in kg/kg
+    patm <- values[3]     # surface  (atmospheric) pressure in Pa
+  
+  ## calculate the mass mixing ratio of water vapor to dry air (dimensionless)
+    wair <- qair / (1 - qair)
+    
+  # Define constants
+    # kR  = 8.3143   # universal gas constant, J/mol/K (Allen, 1973)
+    # kMv = 18.02    # molecular weight of water vapor, g/mol (Tsilingiris, 2008)
+    # kMa = 28.963   # molecular weight of dry air, g/mol (Tsilingiris, 2008)
+    
+  # Calculate water vapor pressure 
+    rv <- 0.4613929  # rv <- kR / kMv
+    rd <- 0.2870663  # rd <- kR / kMa
+    vapr = patm * wair * rv / (rd + wair * rv)
+  
+  # Calculate VPD
+  611.0 * exp( (17.27 * tc)/(tc + 237.3) ) - vapr
+  
+  ## this empirical equation may lead to negative values for VPD
+  ## (happens very rarely). assume positive...
+  # max( 0.0, vpd )
+}
+
+# Compute VPD from the WorldClim data
+vpd_watch <- c(temp_watch, qair_watch, psurf_watch) |>
+  terra::app(calc_vpd_from_qair)
+# vpd_watch <- c(temp_watch, qair_watch, psurf_watch) |>
+#   terra::app(fun = function(i, ff) ff(i),
+#              cores = 4,
+#              ff = calc_vpd_from_qair,        # must export function to the nodes
+#              filename = paste0(here::here(), "/data/vpd_daily_WFDEI_197901.tif"))
+
+# Plot average
+ggplot() +
+  tidyterra::geom_spatraster(data = vpd_watch) +
+  scale_fill_viridis_c(
+    na.value = NA,
+    name = " Vapor Pressure Deficit (Pa) \n"
+    ) +
+  theme_bw() +
+  theme(
+    legend.position = "bottom"
+    )
+```
+
+```{r}
+# Crop VPD raster to Switzerland only and plot
+switzerland_map <- rnaturalearth::ne_countries(scale = "medium", country = "Switzerland", returnclass = "sf")
+
+ggplot() +
+  tidyterra::geom_spatraster(data = vpd_watch |>
+                               terra::crop(vect(switzerland_map))) +
+  scale_fill_viridis_c(
+    na.value = NA,
+    name = " Vapor Pressure Deficit (Pa) \n"
+    ) +
+  theme_bw() +
+  theme(
+    legend.position = "bottom"
+    )
+```
+
