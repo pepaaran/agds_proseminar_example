@@ -19,7 +19,7 @@ The 30sec gridded data from WorldClim can be directly downloaded from https://ww
 
 - **tavg**: average monthly temperature ($^\text{o}$C)
 - **vapr**: water vapor pressure (kPa)
-- **elev**: elevation
+- **elev**: elevation (m)
 
 Let's take a look at the average temperature across the globe in January, between the years 1970-2000.
 ```{r}
@@ -69,7 +69,7 @@ $$ VPD = 0.611 \exp \left({\frac{17.27 T}{T + 237.3}} \right) - P $$
 
 where $T$ stands for temperature and $P$ for water vapor pressure.
 
-```{r}
+```{r eval = FALSE}
 # Define function to compute VPD
 calc_vpd_from_vapr <- function(values){
   # Use the raster layers as a vector
@@ -81,9 +81,25 @@ calc_vpd_from_vapr <- function(values){
 }
 
 # Compute VPD from the WorldClim data
-vpd_worlclim <- c(temp_worldclim, vapr_worldclim) |>
-  terra::app(calc_vpd_from_vapr)
+# vpd_worlclim <- c(temp_worldclim, vapr_worldclim) |>
+#   terra::app(calc_vpd_from_vapr)
+vpd_worldclim <- c(temp_worldclim, vapr_worldclim) |>
+  terra::app(fun = function(i, ff) ff(i),
+             cores = 4,
+             ff = calc_vpd_from_vapr,        # must export function to the nodes
+             filename = paste0(here::here(), "/data/wc2.1_30s_vpd_01.tif"))
 
+# Plot average
+ggplot() +
+  tidyterra::geom_spatraster(data = vpd_worldclim) +
+  scale_fill_viridis_c(
+    na.value = NA,
+    name = "Vapor Pressure Deficit (Pa) \n"
+    ) +
+  theme_bw() +
+  theme(
+    legend.position = "bottom"
+    )
 ```
 
 
