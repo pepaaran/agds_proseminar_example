@@ -22,6 +22,8 @@ library(rnaturalearthdata)
 
 Since the WorldClim data is too heavy to process locally, we will crop the global maps and work with the territory covering Switzerland only. 
 
+## Subset data and compute VPD
+
 We start by loading the WorldClim data and saving the cropped files.
 ```{r}
 # Path for WorldClim data
@@ -35,7 +37,7 @@ switzerland_map <- ne_countries(scale = "medium", country = "Switzerland", retur
 
 # Crop approximately the area of Switzerland
 temp_worldclim <- terra::crop(x = temp_worldclim,
-                              y = vect(switzerland_map))
+                              y = terra::vect(switzerland_map))
 
 # Plot average January temperature in Switzerland
 ggplot() +
@@ -63,7 +65,7 @@ temp_watch <- terra::rast(file_list[1]) - 273.15
 
 # Crop approximately the area of Switzerland for all daily data
 temp_watch <- terra::crop(x = temp_watch,
-                              y = vect(switzerland_map))
+                              y = terra::vect(switzerland_map))
 
 # Plot month average
 ggplot() +
@@ -106,7 +108,7 @@ process_worldclim <- function(
   # Read water vapor pressure data and crop
   path_vapr <- paste0(data_path, "/wc2.1_30s_vapr_", month, ".tif")
   vapr_worldclim <- terra::rast(path_vapr) |>
-    terra::crop(vect(crop_map))
+    terra::crop(vect(crop_map)) / 1000         # kPa -> Pa
   
   # Compute VPD from the WorldClim data
   # vpd_worldclim <- c(temp_worldclim, vapr_worldclim) |>
@@ -114,14 +116,16 @@ process_worldclim <- function(
   vpd_worldclim <- c(temp_worldclim, vapr_worldclim) |>
     terra::app(fun = function(i, ff) ff(i),
                cores = cores,
-               ff = calc_vpd_from_vapr,        # must export function to the nodes
-               filename = filename,
-               overwrite = TRUE)  
+               ff = calc_vpd_from_vapr)        # must export function to the nodes
   
   # Return a single raster with two layers
   terra::add(temp_worldclim) <- vpd_worldclim
   names(temp_worldclim) <- paste0(c("tavg_", "vpd_"), month)
-  temp_worldclim
+  temp_worldclim |>
+    terra::writeRaster(
+      filename = filename,
+      overwrite = TRUE
+    )
 }
 
 # Process data for all 12 months
@@ -136,6 +140,80 @@ for(m in c(paste0("0", 1:9), "10", "11", "12")){
 }
 ```
 
+We repeat the exercise for all WATCH-WFDEI data. Although the resolution of the data is much coarser, the fact that we have daily values makes the processing quite time consuming. We will work with an example first and then optimize the runtime to downscale all data in 1979-2018.
+```{r}
+# Define functions to get global monthly climatology
+# (1979-2000 to align with WorldClim)
+source("R/derive_monthly_temperature.R")
+
+# Get average temperature for all 12 months
+for(m in c(paste0("0", 1:9), "10", "11", "12")){
+  derive_monthly_temperature(
+    data_path = "~/data/archive/wfdei_weedon_2014/data",
+    month = m,
+    crop_map = ne_countries(scale = "medium", country = "Switzerland", returnclass = "sf"),
+    filename = paste0("data/watch_CH_tavg_", m, ".tif"),
+    cores = 1
+  )
+}
+
+
+# Let's plot the August temperature as example
+# plot_worldclim("data/watch_CH_tavg_08.tif", "tavg_08")
+```
+
+```{r}
+# Define function to compute VPD
+calc_vpd_from_qair <- function(tc, qair, patm){
+  # Use the raster layers as a vector
+  # tc:   temperature in C
+  # qair: specific humidity in kg/kg
+  # patm: surface  (atmospheric) pressure in Pa
+  
+  ## calculate the mass mixing ratio of water vapor to dry air (dimensionless)
+  wair <- qair / (1 - qair)
+  
+  # Define constants
+  # kR  = 8.3143   # universal gas constant, J/mol/K (Allen, 1973)
+  # kMv = 18.02    # molecular weight of water vapor, g/mol (Tsilingiris, 2008)
+  # kMa = 28.963   # molecular weight of dry air, g/mol (Tsilingiris, 2008)
+  
+  # Calculate water vapor pressure 
+  rv <- 0.4613929  # rv <- kR / kMv
+  rd <- 0.2870663  # rd <- kR / kMa
+  vapr <- patm * wair * rv / (rd + wair * rv)
+  
+  # Calculate VPD
+  611.0 * exp( (17.27 * tc)/(tc + 237.3) ) - vapr
+  
+  ## this empirical equation may lead to negative values for VPD
+  ## (happens very rarely). assume positive...
+  # max( 0.0, vpd )
+}
+
+# Define functions to get global monthly climatology
+# (1979-2000 to align with WorldClim)
+# Simultaneously save daily cropped rasters for temperature and VPD in data/
+source("R/derive_monthly_vpd.R")
+
+# Get average temperature for all 12 months
+for(m in c(paste0("0", 1:9), "10", "11", "12")){
+  derive_monthly_vpd(
+    data_path = "~/data/archive/wfdei_weedon_2014/data",
+    month = m,
+    crop_map = ne_countries(scale = "medium", country = "Switzerland", returnclass = "sf"),
+    filename = paste0("data/watch_CH_vpd_", m, ".tif"),
+    cores = 1
+  )
+}
+
+
+# Let's plot the August temperature as example
+# plot_worldclim("data/watch_CH_vpd_08.tif", "vpd_08")
+```
+
+### Plotting data subsets
+
 Finally, let's plot the data. To make it easier, we will define a function that we can reuse which uses the data saved in files.
 ```{r}
 # Function that plots data in file
@@ -143,25 +221,49 @@ plot_worldclim <- function(filename, layer_name){
   # Read file
   r <- terra::rast(filename)
   
-  # Define plot legend
-  name_legend <- ifelse(grepl("tavg",layer_name),
-                        "Temperature (C) \n",
-                        "Vapor Pressure Deficit (Pa) \n")
+  # Define plot legend and range
+  if(grepl("tavg", layer_name)){
+    ggplot() +
+      tidyterra::geom_spatraster(data = r[[layer_name]] ) +
+      scale_fill_viridis_c(
+        na.value = NA,
+        name = "Temperature (C) \n",
+        limits = c(-40, 40)
+        ) +
+      theme_bw() +
+      theme(
+        legend.position = "bottom"
+        )
+  }else if(grepl("vpd", layer_name)){
+    ggplot() +
+      tidyterra::geom_spatraster(data = r[[layer_name]] ) +
+      scale_fill_viridis_c(
+        na.value = NA,
+        name = "Vapor Pressure Deficit (Pa) \n",
+        limits = c(0, 3000)
+        ) +
+      theme_bw() +
+      theme(
+        legend.position = "bottom"
+        )
+  }
   
-  ggplot() +
-  tidyterra::geom_spatraster(data = r[[layer_name]] ) +
-  scale_fill_viridis_c(
-    na.value = NA,
-    name = name_legend
-    ) +
-  theme_bw() +
-  theme(
-    legend.position = "bottom"
-    )
 }
 
-plot_worldclim("data/wc2.1_30s_CH_tavg_vpd_08.tif",
-               layer_name = "lyr.1")
+plot_worldclim("data/wc2.1_30s_CH_tavg_vpd_01.tif",
+               layer_name = "tavg_01")
+plot_worldclim("data/wc2.1_30s_CH_tavg_vpd_01.tif",
+               layer_name = "vpd_01")
+plot_worldclim("data/watch_CH_tavg_01.tif",
+               layer_name = "tavg_01")
+plot_worldclim("data/watch_CH_vpd_01.tif",
+               layer_name = "vpd_01")
+
+
+plot_worldclim("data/wc2.1_30s_CH_tavg_vpd_07.tif",
+               layer_name = "tavg_07")
+plot_worldclim("data/wc2.1_30s_CH_tavg_vpd_07.tif",
+               layer_name = "vpd_07")
 ```
 
-
+#
