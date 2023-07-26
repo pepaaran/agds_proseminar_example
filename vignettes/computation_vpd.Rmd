@@ -23,7 +23,7 @@ The [WorldClim dataset](https://www.worldclim.org/data/worldclim21.html) provide
 - **elev**: elevation (m)
 
 Therefore, VPD can easily computed from the equation above, doing an easy unit change. Let's create a function that does this calculation:
-```{r}
+```{r eval = FALSE}
 calc_vpd_from_vapr <- function(t, e){
   # t: temperature in degrees C
   # e: water vapor pressure in Pa
@@ -54,7 +54,7 @@ where $P$ is the total air pressure in Pa and $e$ the water vapor pressure. This
 
 $$ e = 1.608 \; q \; P $$
 Analogously, we can define a function that calculates VPD from the variables available in WATCH-WFDEI:
-```{r}
+```{r eval = FALSE}
 calc_vpd_from_qair <- function(t, q, P){
   # t: temperature in degrees C
   # q: specific humidity in kg/kg
