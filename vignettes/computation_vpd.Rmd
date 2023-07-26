@@ -1,0 +1,82 @@
+---
+title: "Computation of VPD"
+author: "Pepa Aran"
+date: "2023-07-26"
+output: html_document
+---
+
+Vapor Pressure Deficit is the difference between the saturation vapor pressure ($e_s$) and the actual vapor pressure ($e$). It indicates the evaporative potential of air, therefore informing the rate of photosynthesis in vegetation models.
+
+$$ VPD = e_S - e $$
+The saturation vapor pressure, i.e. the maximum amount of water vapor that air can hold, increases exponentially with warmer temperature. Warm air ca hold considerably more water when saturated than can colder air. It can be computed following eq. 5.1 in Evaporation and Evapotranspiration (Abtew and Meleese 2013, Ch 5),
+
+$$ e_S (T) = 0.611 \exp \left({\frac{17.27 T}{T + 237.3}} \right) $$
+
+where temperature ($T$) is given in degrees Celsius.
+
+## Computing VPD with WorldClim data
+
+The [WorldClim dataset](https://www.worldclim.org/data/worldclim21.html) provides the following variables, among others:
+
+- **tavg**: average monthly temperature (Celsius)
+- **vapr**: water vapor pressure (kPa)
+- **elev**: elevation (m)
+
+Therefore, VPD can easily computed from the equation above, doing an easy unit change. Let's create a function that does this calculation:
+```{r}
+calc_vpd_from_vapr <- function(t, e){
+  # t: temperature in degrees C
+  # e: water vapor pressure in Pa
+  
+  # Calculate e_S (saturation vapor pressure) as a function of temperature
+  e_S <- 611.0 * exp( (17.27 * t)/(t + 237.3) )
+  
+  # Calculate VPD
+  e_S - e
+}
+```
+
+## Computing VPD with WATCH-WFDEI data
+
+The [WATCH-WFDEI dataset](https://agupubs.onlinelibrary.wiley.com/doi/full/10.1002/2014WR015638) provides many variables, including:
+
+- **Tair**: daily average (of 3-hourly) near surface air temperature (in Kelvin) at 2m at time stamp.
+- **Qair**: daily average specific humidity (in kg water / kg air) at 2m above surface.
+- **PSurf**: daily average surface total pressure (in hPa).
+
+Since water vapor pressure measurements are not available directly, we need to compute it from the variables that are provided.
+
+Specific humidity ($q$) is defined as the ratio of the mass of water vapor in a parcel of air to the total mass of the air. Following Eq. 3.15 in Ecological Climatology (Bonan, 2008), specific humidity can be computed as
+
+$$ q = \frac{0.622 e}{P - 0.378 e} $$
+
+where $P$ is the total air pressure in Pa and $e$ the water vapor pressure. This equation and its constants are derived from the ideal gas law and the gas constants for water vapor and dry air. Because water vapor typically comprises 1 - 4\% of air, the partial pressure of air due to water vapor is much smaller than the total air pressure, that is $ P >> e$. Thus we obtain an approximation for the actual water vapor pressure
+
+$$ e = 1.608 \; q \; P $$
+Analogously, we can define a function that calculates VPD from the variables available in WATCH-WFDEI:
+```{r}
+calc_vpd_from_qair <- function(t, q, P){
+  # t: temperature in degrees C
+  # q: specific humidity in kg/kg
+  # P: total air pressure in Pa
+  
+  # Calculate e_S (saturation vapor pressure) as a function of temperature
+  e_S <- 611.0 * exp( (17.27 * t)/(t + 237.3) )
+  
+  # Approximate e (actual vapor pressure) from total air pressure and specific
+  # humidity
+  e <- 1.608 * q * P
+  
+  # Calculate VPD
+  e_S - e
+}
+```
+
+
+
+
+
+
+
+
+
