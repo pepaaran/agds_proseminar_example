@@ -10,9 +10,9 @@ Vapor Pressure Deficit is the difference between the saturation vapor pressure (
 $$ VPD = e_S - e $$
 The saturation vapor pressure, i.e. the maximum amount of water vapor that air can hold, increases exponentially with warmer temperature. Warm air ca hold considerably more water when saturated than can colder air. It can be computed following eq. 5.1 in Evaporation and Evapotranspiration (Abtew and Meleese 2013, Ch 5),
 
-$$ e_S (T) = 0.611 \exp \left({\frac{17.27 T}{T + 237.3}} \right) $$
+$$ e_S (T) = 611 \; \exp \left({\frac{17.27 \; T}{T + 237.3}} \right) $$
 
-where temperature ($T$) is given in degrees Celsius.
+where temperature ($T$) is given in degrees Celsius and the resulting $e_S$ is in Pa.
 
 ## Computing VPD with WorldClim data
 
