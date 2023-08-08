@@ -20,7 +20,6 @@ The [WorldClim dataset](https://www.worldclim.org/data/worldclim21.html) provide
 
 - **tavg**: average monthly temperature (Celsius)
 - **vapr**: water vapor pressure (kPa)
-- **elev**: elevation (m)
 
 Therefore, VPD can easily computed from the equation above, doing an easy unit change. Let's create a function that does this calculation:
 ```{r eval = FALSE}
