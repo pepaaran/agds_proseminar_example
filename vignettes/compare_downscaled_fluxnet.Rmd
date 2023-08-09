@@ -1,0 +1,75 @@
+---
+title: "Comparing downscaled values to FluxNet measurements"
+author: "Pepa Aran"
+date: "2023-08-09"
+output: html_document
+---
+
+```{r, setup, include=FALSE}
+knitr::opts_knit$set(root.dir = here::here())
+
+library(dplyr)
+library(stringr)
+library(terra)
+library(ggplot2)
+library(tidyterra)
+```
+
+The FLUXNET2015 dataset includes continuous measurements of ecosystem fluxes (CO2, water vapor, latent heat...) and physical variables (air temperature, precipitation, radiation...), from 212 sites around the world and in high temporal resolution. We are interested in daily averages of temperature and VPD from various Swiss FLUXNET sites (see information [here](https://fluxnet.org/sites/site-list-and-pages/).
+
+<!-- Plot of the Swiss map with the site locations in different colours, indicated in the legend. -->
+```{r}
+# Define FLUXNET site information from online table
+fluxnet_sites <- data.frame(
+  site_code = c("CH-Cha", "CH-Dav", "CH-Fru", "CH-Lae", "CH-Oe1", "CH-Oe2"),
+  site_name = c("Chamau", "Davos", "Früebüel", "Laegern", 
+                "Oesingen grassland", "Oesingen crop"),
+  lon = c(8.4104, 9.8559, 8.5378, 8.3644, 7.7319, 7.7337),
+  lat = c(47.2102, 46.8153, 47.1158, 47.4783, 47.2858, 47.2864),
+  elv = c(393, 1639, 982, 689, 450, 452)
+)
+
+library(ggmap)
+
+# get the map info
+map <- get_map("Switzerland", zoom = 8, maptype = "satellite")
+ 
+# Plot it
+ggmap(map) + 
+  theme_void() + 
+  ggtitle("terrain") + 
+  theme(
+    plot.title = element_text(colour = "orange"), 
+    panel.border = element_rect(colour = "grey", fill=NA, size=2)
+  )
+```
+
+```{r}
+path_fluxnet <- "~/data/archive/fluxnet_pastorello_2020/data"
+
+dd <- read.csv(paste0(path_fluxnet, "FLX_CH-Cha_FLUXNET2015_FULLSET_DD_2005-2014_2-4.csv"))
+```
+
+
+To download the data, it's necessary to create an AMERIFLUX account. After logging in, the data can be directly downloaded in .zip files from https://fluxnet.org/data/download-data/, filtering for the 6 sites with the prefix CH. All variables are described in the table [here](https://fluxnet.org/data/fluxnet2015-dataset/fullset-data-product/) and in the AGDS I book.
+
+We are interested in the following variables:
+- TIMESTAMP: Time stamp in short format (YYYYMMDDHHMM).
+- TA_F_DD: Air temperature (in $^\text{o}$C), averaged from half-hourly data into daily data and gap-filled.
+- TA_F_QC_DD: Quality flag for TA_F_DD, indicating the fraction between 0-1 of measured temperature vs gap-filled data.
+- VPD_F_DD: Vapor Pressure Deficit (in hPa), averaged from harlf-hourly data into daily data and gap-filled.
+- VPD_F_QC_DD: Quality flag for VPD_F_DD, indicating the fraction between 0-1 of measured VPD vs gap-filled data.
+
+The time stamp will allow us to compare the measurements in this time-series to daily values from the raster files (must be opened one by one). Furthermore, we can filter the temperature and VPD time-series to retain only measured data, thus avoiding the comparison of our downscaled WATCH-WFDEI data with downscaled ERA5 data (which the FLUXNET product uses).
+
+### Read FLUXNET data and filter measurements
+
+We first take a look at the data availability at each one of the Swiss sites. We are interested in how many years of data were collected and the general quality of those data.
+
+<!-- Plot of the distribution of data quality (histogram) and a time series of temperature and VPD for each site. -->
+
+### Get time series of downscaled data for flux sites
+
+- Compute downscaled rasters for the years of flux data
+- Extract values for site coordinates
+- 
