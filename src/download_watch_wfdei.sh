@@ -21,6 +21,7 @@ get WFDEI-elevation.nc.gz -o WFDEI-elevation.nc.gz
 bye
 EOF
 
+# Unzip files into each folder
 gzip -d PSurf_daily/*.gz
 gzip -d Qair_daily/*.gz
 gzip -d Tair_daily/*.gz
