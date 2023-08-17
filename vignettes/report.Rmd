@@ -14,10 +14,42 @@ library(ggplot2)
 library(tidyterra)
 ```
 
+# Introduction
+
 This report presents an Applied Geo-Data Science project aimed at spatially downscaling daily Vapor Pressure Deficit (VPD) and temperature values to address vegetation modelling questions. By improving the spatial resolution of climatic data, we can gain valuable insights into the relationships between environmental variables and vegetation dynamics at finer scales. 
 
 This project proposes the integration of daily meteorological data from the WATCH-WFDEI dataset with a finer spatial grid dataset like Worldclim, which provides averaged values over 30 years, to achieve higher spatial resolution. Average daily temperature data is directly provided in both datasets and we will use measurements of specific humidity from WATCH-WFDEI and vapour pressure from Worldclim to compute VPD. A simple de-biasing technique will be employed to combine the two datasets effectively. Finally, the quality of the downscaling will be evaluated through various means, including visualization and comparison with temperature and VPD measurements from FLUXNET2015 sites.
  
+# Data selection
+
+- WATCH-WFDEI + show  global plot
+
+- WorldClim + show global plot
+
+- FLUXNET2015 + show time series from Laegern
+
+# Data processing
+
+- The `terra` package simplifies the processing of all raster files. We implemented custom processing functions that read .tif (from WorldClim) and .nc (from WATCH-WFDEI) files, aggregate data over the time axis, re-grid raster files and perform complex operations to all data pixels. 
+
+- Calculating VPD
+
+- Due to the fine spatial resolution of the WorldClim dataset, performing calculations on the monthly raster files is very memory intensive. Running the code locally is not possible, therefore we have focused on the area of Switzerland for the remainder of the project. Whenever bigger computational resources are available, the same code could be used to obtain global maps with downscaled values of temperature and VPD.
+
+- Downscaling workflow
+
+- Results and plots, comparing downscaled values
+
+# Data evaluation
+
+- Selection of FLUXNET sites and explanation
+
+- Visual comparison
+
+- Discussion
+
+# Conclusion
+
 # Reading the raw data
 
 Instead of getting the global map, we will first implement the procedure for the gird cells corresponding to the swiss FLUXNET2015 sites.
@@ -91,91 +123,6 @@ ggplot() +
     )
 ```
 
-WATCH-WFDEI does not provide vapor pressure deficit (VPD) values directly, therefore we need to calculate them from the variables that are available. We can use the following formula:
-
-$ VPD = 0.611 \exp[ (17.27 tc)/(tc + 237.3) ] - ea$ 
-             vpd = 0.611*exp[ (17.27 tc)/(tc + 237.3) ] - ea
-             where:
-                 tc = average daily air temperature, deg C
-                 eact  = actual vapor pressure, Pa
-  
-  
->  Ref: Eq. 5.1, Abtew and Meleese (2013), Ch. 5 Vapor Pressure Calculation Methods, in Evaporation and Evapotranspiration: Measurements and Estimations, Springer, London.
-
-```{r eval = FALSE}
-# Define functions to compute VPD
-calc_vpd_from_qair <- function(qair, elv, patm0 = 101325){
-  
-  # Calculate atmospheric pressure
-  patm <- calc_patm(elv, patm0)
-  
-  # Define constants
-  kR  = 8.3143   # universal gas constant, J/mol/K (Allen, 1973)
-  kMv = 18.02    # molecular weight of water vapor, g/mol (Tsilingiris, 2008)
-  kMa = 28.963   # molecular weight of dry air, g/mol (Tsilingiris, 2008)
-    
-  ## calculate the mass mixing ratio of water vapor to dry air (dimensionless)
-  wair <- qair / (1 - qair)
-  
-  ## calculate water vapor pressure 
-  rv <- kR / kMv
-  rd <- kR / kMa
-  eact = patm * wair * rv / (rd + wair * rv)
-}
-
-
-calc_patm <- function(elv, patm0 = 101325){
-  # Define constants
-  kTo <- 298.15    # base temperature, K (Prentice, unpublished)
-  kL  <- 0.0065    # adiabiatic temperature lapse rate, K/m (Allen, 1973)
-  kG  <- 9.80665   # gravitational acceleration, m/s^2 (Allen, 1973)
-  kR  <- 8.3145    # universal gas constant, J/mol/K (Allen, 1973)
-  kMa <- 0.028963  # molecular weight of dry air, kg/mol (Tsilingiris, 2008)
-  
-  # Convert elevation to pressure, Pa:
-  patm0*(1.0 - kL*elv/kTo)^(kG*kMa/(kR*kL))
-}
-```
-
-
-
-```{r eval = FALSE}
-# Transform the WATCH-WFDEI raster to match the grid from WorldClim
-temp_finer <- resample(temp_avg, temp_worldclim, method = "near")
-
-# Substract the bias from the measured temperature
-```
-
-
-```{r eval = FALSE}
-# Load libraries to read data
-library(ncdf4)
-
-# Set the path to the directory containing the .nc files
-data_dir <- "~/data/archive/wfdei_weedon_2014/data/Tair_daily/"
-
-# Get the list of .nc files in the directory
-file_list <- list.files(data_dir, pattern = "*.nc", full.names = TRUE)
-
-# Loop through each .nc file
-for (file in file_list) {
-  # Open the raster file
-  nc_data <- nc_open(file)
-  
-  # Extract the necessary variables (e.g., VPD and temperature)
-  
-  temperature <- ncvar_get(nc_data, "Tair")
-  # Note that NAs are given for ocean surface
-  
-  temperature <- ncvar_get(nc_data, "temperature")
-  
-  # Do further processing or analysis with the extracted variables
-  
-  # Close the .nc file
-  nc_close(nc_data)
-}
-
-```
 
 ## Read monthly average climatology from WorldClim
 
@@ -184,6 +131,42 @@ The WorldClim dataset represents average monthly climate data for 1970-2000.
 
 # VPD downscaling 
 
+Processing raster data in high resolution is memory and computationally intensive
+```{r}
+# Load defined functions
+source("R/calc_vpd_from_qair.R")
+source("R/calc_vpd_from_vapr.R")
+source("R/compute_monthly_climatology.R")
+source("R/get_daily_t_vpd.R")
+source("R/get_worldclim_t_vpd.R")
+source("R/debias_t_vpd.R")
+source("R/downscale_t_vpd.R")
+
+# The last function calls the others internally, such that a single function
+# call processes all data for a given month.
+downscale_t_vpd(
+  path_worldclim = "~/data/archive/worldclim_fick_2017/data",
+  path_watch = "~/data/archive/wfdei_weedon_2014/data",
+  crop_map = rnaturalearth::ne_countries(scale = "medium", 
+                                         country = "Switzerland", 
+                                         returnclass = "sf"),
+  month = "01",     # February
+  cores = 1
+)
+```
+
+Let's take a look at the downscaled data, comparing to the original WATCH-WFDEI map.
+```{r}
+source("R/plot_daily.R")
+
+# Plot original daily average temperature
+plot_daily("data/tavg_vpd_daily_197901.tif",
+           layer_name = "tavg", day = 0)
+
+# Plot downscaled temperature
+plot_daily("data/tavg_vpd_daily_downscaled_197901.tif",
+           layer_name = "tavg", day = 0)
+```
 
 ## Get coordinates for the map of Switzreland
 
