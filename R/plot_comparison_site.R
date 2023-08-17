@@ -50,7 +50,7 @@ plot_comparison_site <- function(
     xlab("Date") +
     ylab("VPD (Pa)") +
     theme_classic() +
-    labs(title = paste("Measured vs downscaled VPD   ", site_code) )
+    labs(title = paste("Downscaling evaluation for ", site_code) )
   
   p2 <- ggplot(df_joint) +
     geom_point(aes(x = VPD_F, y = vpd), alpha = 0.3) +
@@ -89,7 +89,7 @@ plot_comparison_site <- function(
     xlab("Date") +
     ylab("Temperature (C)") +
     theme_classic() +
-    labs(title = "Measured vs downscaled temperature") 
+    labs(title = "") 
   
   p4 <- ggplot(df_joint) +
     geom_point(aes(x = TA_F, y = tavg), alpha = 0.3) +
@@ -112,5 +112,5 @@ plot_comparison_site <- function(
                             format()
     ))
   
-  cowplot::plot_grid(p1, p3, p2, p4, ncol = 2)
+  cowplot::plot_grid(p1, p3, p2, p4, ncol = 2) |> print()
 }
