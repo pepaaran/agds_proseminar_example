@@ -1,5 +1,5 @@
 ---
-title: "Comparing downscaled values to FluxNet measurements"
+title: "Comparing downscaled values to FLUXNET measurements"
 author: "Pepa Aran"
 date: "2023-08-09"
 output: html_document
@@ -13,6 +13,7 @@ library(stringr)
 library(terra)
 library(ggplot2)
 library(tidyterra)
+library(leaflet)
 ```
 
 The FLUXNET2015 dataset includes continuous measurements of ecosystem fluxes (CO2, water vapor, latent heat...) and physical variables (air temperature, precipitation, radiation...), from 212 sites around the world and in high temporal resolution. We are interested in daily averages of temperature and VPD from various Swiss FLUXNET sites (see information [here](https://fluxnet.org/sites/site-list-and-pages/).
@@ -29,47 +30,215 @@ fluxnet_sites <- data.frame(
   elv = c(393, 1639, 982, 689, 450, 452)
 )
 
-library(ggmap)
+# Plot locations with leaflet
+leaflet() |>
+  addProviderTiles(providers$Esri.WorldImagery, group = "World Imagery") |>
+  addCircleMarkers(lng = fluxnet_sites$lon,
+             lat = fluxnet_sites$lat,
+             label = paste0(fluxnet_sites$site_code, " (", fluxnet_sites$site_name, ")")) |>
+  fitBounds(lng1 = 5.966667, lng2 = 10.45833,
+            lat1 = 45.83333, lat2 = 47.775)
 
-# get the map info
-map <- get_map("Switzerland", zoom = 8, maptype = "satellite")
- 
-# Plot it
-ggmap(map) + 
-  theme_void() + 
-  ggtitle("terrain") + 
-  theme(
-    plot.title = element_text(colour = "orange"), 
-    panel.border = element_rect(colour = "grey", fill=NA, size=2)
-  )
 ```
-
-```{r}
-path_fluxnet <- "~/data/archive/fluxnet_pastorello_2020/data"
-
-dd <- read.csv(paste0(path_fluxnet, "FLX_CH-Cha_FLUXNET2015_FULLSET_DD_2005-2014_2-4.csv"))
-```
-
 
 To download the data, it's necessary to create an AMERIFLUX account. After logging in, the data can be directly downloaded in .zip files from https://fluxnet.org/data/download-data/, filtering for the 6 sites with the prefix CH. All variables are described in the table [here](https://fluxnet.org/data/fluxnet2015-dataset/fullset-data-product/) and in the AGDS I book.
 
-We are interested in the following variables:
+We are interested in the following variables from the daily files (DD):
 - TIMESTAMP: Time stamp in short format (YYYYMMDDHHMM).
-- TA_F_DD: Air temperature (in $^\text{o}$C), averaged from half-hourly data into daily data and gap-filled.
-- TA_F_QC_DD: Quality flag for TA_F_DD, indicating the fraction between 0-1 of measured temperature vs gap-filled data.
-- VPD_F_DD: Vapor Pressure Deficit (in hPa), averaged from harlf-hourly data into daily data and gap-filled.
-- VPD_F_QC_DD: Quality flag for VPD_F_DD, indicating the fraction between 0-1 of measured VPD vs gap-filled data.
+- TA_F: Air temperature (in $^\text{o}$C), averaged from half-hourly data into daily data and gap-filled.
+- TA_F_QC: Quality flag for TA_F, indicating the fraction between 0-1 of measured temperature vs gap-filled data.
+- VPD_F: Vapor Pressure Deficit (in hPa), averaged from harlf-hourly data into daily data and gap-filled.
+- VPD_F_QC: Quality flag for VPD_F, indicating the fraction between 0-1 of measured VPD vs gap-filled data.
 
 The time stamp will allow us to compare the measurements in this time-series to daily values from the raster files (must be opened one by one). Furthermore, we can filter the temperature and VPD time-series to retain only measured data, thus avoiding the comparison of our downscaled WATCH-WFDEI data with downscaled ERA5 data (which the FLUXNET product uses).
 
 ### Read FLUXNET data and filter measurements
 
-We first take a look at the data availability at each one of the Swiss sites. We are interested in how many years of data were collected and the general quality of those data.
+We first take a look at the data availability at each one of the Swiss sites. We are interested in how many years of data were collected and the general quality of those data. For the Chamau site, 66\% of data is observed, which we can use for comparing. 
+
+```{r}
+# Define data path
+path_fluxnet <- "~/data/archive/fluxnet_pastorello_2020/data"
+
+dd <- read.csv(paste0(path_fluxnet, "/FLX_CH-Dav_FLUXNET2015_FULLSET_DD_1997-2014_1-4.csv")) |>
+  dplyr::select(TIMESTAMP,
+                TA_F,
+                TA_F_QC,
+                VPD_F,
+                VPD_F_QC) |>
+  dplyr::mutate(TIMESTAMP = as.Date(strptime(TIMESTAMP, format = "%Y%m%d")))
+
+# Check what proportion of data is only observed
+dd |>
+  dplyr::count(TA_F_QC == 1, VPD_F_QC == 1) |>
+  dplyr::mutate(n = n/nrow(dd)) |>
+  print()
+```
 
 <!-- Plot of the distribution of data quality (histogram) and a time series of temperature and VPD for each site. -->
+```{r}
+# Prepare data for plotting
+dd_plot <- data.frame(TIMESTAMP = dd$TIMESTAMP,
+                      variable = c(rep("Temperature (C)", nrow(dd)),
+                                   rep("VPD (hPa)", nrow(dd))),
+                      value = c(dd$TA_F,
+                                dd$VPD_F),
+                      qc = c(dd$TA_F_QC,
+                             dd$VPD_F_QC))
+
+# Plot temperature and VPD in Chamau
+ggplot(data = dd_plot) +
+  geom_line(aes(x = TIMESTAMP , y = value, col = qc)) +
+  scale_color_viridis_c() +
+  facet_wrap(~ variable)
+
+```
+
+Finally, we can get the data from all flux sites. We discard the gap-filled values and keep only directly measured temperature and VPD, to be compared with our downscaling. The workflow was implemented in the `get_fluxnet_data()` function, which will be called below.
+```{r}
+source("R/get_fluxnet_data.R")
+
+data_flux_sites <- lapply(fluxnet_sites$site_code,
+       function(code) get_fluxnet_data(path_fluxnet, code) |>
+         dplyr::mutate(ID = code))
+```
 
 ### Get time series of downscaled data for flux sites
 
 - Compute downscaled rasters for the years of flux data
-- Extract values for site coordinates
-- 
+The earliest temperature and VPD observations were measured in Davos starting in 1997. The remaining flux measurement sites were established between 2002 and 2009, and data was recorded in all sites until 2014. Therefore, we want to compute downscaled temperature and VPD values from years 1997-2014 and compare them to the observations.
+```{r eval = FALSE}
+# Load defined functions
+source("R/calc_vpd_from_qair.R")
+source("R/calc_vpd_from_vapr.R")
+source("R/compute_monthly_climatology.R")
+source("R/get_daily_t_vpd.R")
+source("R/get_worldclim_t_vpd.R")
+source("R/debias_t_vpd.R")
+source("R/downscale_t_vpd.R")
+
+# Obtain downscaled values for all months and years covering the flux observations
+for(m in c("01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12")){
+  downscale_t_vpd(
+    path_worldclim = "~/data/archive/worldclim_fick_2017/data",
+    path_watch = "~/data/archive/wfdei_weedon_2014/data",
+    crop_map = rnaturalearth::ne_countries(scale = "medium", 
+                                           country = "Switzerland", 
+                                           returnclass = "sf"),
+    month = m,     # months
+    downscale_years = 1997:2014,
+    compute_bias = TRUE,
+    cores = 1
+  )
+}
+
+# The downscaled data is saved in the data/ directory
+```
+
+The daily downscaled data is saved in files, grouped by month and year. In order to obtain a time series of temperature and VPD for our desired locations, we need to open the files one by one and extract the desired pixels.
+```{r}
+# Load function
+source("R/get_downscaled_time_series.R")
+
+# Extract downscaled daily time series for a given set of sites and years
+daily_downscaled <- get_downscaled_time_series(
+  years = 1997:2014,
+  fluxnet_sites = fluxnet_sites
+)
+
+# Save time series of downscaled data for Swiss sites
+save(daily_downscaled, file = "data/daily_downscaled.rda")
+```
+
+```{r eval = FALSE, echo = FALSE}
+ggplot(daily_downscaled) +
+  geom_line(aes(x = tstep , y = vpd)) +
+  facet_wrap(~ ID, ncol = 3) +
+  theme_classic() +
+  ggtitle("Downscaled VPD in Pa")
+
+ggplot(daily_downscaled) +
+  geom_line(aes(x = tstep , y = tavg)) +
+  facet_wrap(~ ID, ncol = 3) +
+  theme_classic() +
+  ggtitle("Downscaled temperature in C")
+```
+
+```{r eval = FALSE, echo = FALSE}
+# A different processing to prepare data for plotting
+daily_downscaled_plot <- data.frame()
+# For all months and years, add data to 
+for(year in 1997:2014){
+  for(month in c(paste0("0", 1:9), "10", "11", "12")){
+    
+    # Read data
+    daily <- terra::rast(paste0("data/tavg_vpd_daily_downscaled_", year, month, ".tif")) |>
+      terra::extract(y = fluxnet_sites[, c("lon", "lat")]) |>
+      dplyr::mutate(ID = fluxnet_sites$site_code) 
+    
+    # Make data vertical
+    daily |>
+      tidyr::gather(variable, value, -ID) |>
+      tidyr::separate(variable, c("var", "date"), sep = "_tstep=") |>
+      dplyr::mutate(date = as.Date(as.numeric(date),
+                                   origin = paste(year, month, "01", sep = "-"))) |>
+      # Bind data to data from previous months
+      rbind(daily_downscaled_plot) ->
+      daily_downscaled_plot
+  }
+}
+
+# Plot data
+ggplot(daily_downscaled_plot) +
+  geom_line(aes(x = date , y = value)) +
+  facet_wrap(var ~ ID, ncol = 6)
+```
+
+Finally, we can visually compare the downscaled values to the measurements from FLUXNET2015. For simplicity, we will only look at the data from Davos and Chamau, since they represent different areas in Switzerland and vegetation types.
+```{r fig.width = 10, fig.height = 5, warning = FALSE, message = FALSE}
+# Load function to compare and plot data
+source("R/plot_comparison_site.R")
+
+plot_comparison_site(
+  daily_downscaled,
+  path_fluxnet,
+  site_code = "CH-Dav"
+)
+
+plot_comparison_site(
+  daily_downscaled,
+  path_fluxnet,
+  site_code = "CH-Cha"
+)
+
+plot_comparison_site(
+  daily_downscaled,
+  path_fluxnet,
+  site_code = "CH-Lae"
+)
+
+plot_comparison_site(
+  daily_downscaled,
+  path_fluxnet,
+  site_code = "CH-Fru"
+)
+
+plot_comparison_site(
+  daily_downscaled,
+  path_fluxnet,
+  site_code = "CH-Oe1"
+)
+
+plot_comparison_site(
+  daily_downscaled,
+  path_fluxnet,
+  site_code = "CH-Oe2"
+)
+```
+
+The temperature plot shows that our downscaling works quite well. On average, we predict a temperature that less than 1 degrees Celsius higher than the measured temperature. Nevertheless, there doesn't appear to be any strong systematic error.
+
+On the contrary, the VPD downscaling is quite faulty, especially for the Davos site. Despite capturing seasonal variations in VPD (seen in the time series plots), we tend to underestimate VPD (on average, by 45 Pa). There is a systematic scaling error of approximately 50\%, shown by the slope of the scatterplot. The error may stem from the calculation of VPD from specific humidity (WATCH-WFDEI) and water vapor pressure (WorldClim), or from the fact that VPD was computed on the coarse grid and then de-biased, rather than computed from the downscaled temperature directly. The performance in Chamau is better, which hints that there may be a topological component to our error. Nevertheless, the RMSE is still quite large, indicating that the downscaling may not be good enough to use these data in future research.
+
+- Discuss why we see differences in some sites (Dav, Lag) but the downscaling is quite good for others (Cha). This may have to do with where the site is location with respect to the average of the cell, or whether the area is very mountanous or not. Looking into the data in more detail will help clarify things.
+
