@@ -1,6 +1,8 @@
 # AGDS Proseminar - Example project
 This repository serves as a project sample for the AGDS Proseminar. 
 
+> Throughout the proposal, report and slides, there will be notes like this one indicating instructions and tips for your project implementation. You don't need to include such notes in your submission.
+
 Your project should contain the following parts:
 - Introduce a research question related to geography or Earth systems science with a proposal for answering it via a data analysis.
 - Combine at least two data sources for your analysis.
