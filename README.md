@@ -19,6 +19,7 @@ Your project should contain the following parts:
 
 All of the code necessary to reproduce the results in this project is available in the repository. Public datasets downloaded from the web are kept separately because of their size.
 
+```
 ├── README.md                <- The top-level README includes instructions to use this repository
 |                               and the project proposal for the AGDS Proseminar
 │
@@ -41,6 +42,7 @@ All of the code necessary to reproduce the results in this project is available 
 ├── src                      <- bash code for this project, contains scripts for data download
 |
 ├── R                        <- R functions used in the project, contains one function per script
+```
 
 ## Project proposal
 
