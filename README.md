@@ -1,6 +1,8 @@
 # AGDS Proseminar - Example project
 This repository serves as a project sample for the AGDS Proseminar. 
 
+> NOTE: Throughout the proposal, report and slides, there will be notes like this one indicating instructions and tips for your project implementation. You don't need to include such notes in your submission.
+
 Your project should contain the following parts:
 - Introduce a research question related to geography or Earth systems science with a proposal for answering it via a data analysis.
 - Combine at least two data sources for your analysis.
@@ -12,6 +14,35 @@ Your project should contain the following parts:
 
 
 # Spatial downscaling of meteorological variables
+
+## Repository structure
+
+All of the code necessary to reproduce the results in this project is available in the repository. Public datasets downloaded from the web are kept separately because of their size.
+
+```
+├── README.md                <- The top-level README includes instructions to use this repository
+|                               and the project proposal for the AGDS Proseminar
+│
+├── agds_proseminar_example.Rproj    <- R project file
+| 
+├── renv.lock                <- file to keep package versions for reproducibility
+|
+├── data-raw                 <- folder for data downloaded from the web, unprocessed
+|                               (this folder is never pushed, see .gitignore)
+|
+├── data                     <- folder for data produced by the repository
+│
+├── analysis                 <- R markdown scripts used for the development of the report,
+|                               includes intermediate data analyses
+|
+├── vignettes                <- R markdown files
+│   ├── report.Rmd           <- main file containing the submitted report
+│   └── slides.Rmd           <- file creating presentation slides
+│
+├── src                      <- bash code for this project, contains scripts for data download
+|
+├── R                        <- R functions used in the project, contains one function per script
+```
 
 ## Project proposal
 
