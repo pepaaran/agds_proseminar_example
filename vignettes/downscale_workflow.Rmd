@@ -1,0 +1,239 @@
+---
+title: "Downscaling workflow"
+author: "Pepa Aran"
+date: "2023-07-27"
+output: html_document
+---
+
+```{r, setup, include=FALSE}
+knitr::opts_knit$set(root.dir = here::here())
+
+library(dplyr)
+library(stringr)
+library(terra)
+library(ggplot2)
+library(tidyterra)
+library(maps)
+library(rnaturalearth)
+library(rnaturalearthdata)
+```
+
+# Downscaling temperature and VPD
+
+Here we present the full workflow for the project, from raw rater data to the downscaled daily values. This code is then moved to a function `downscale_temp_vpd()` in order to run the workflow for all months of the year.
+
+Firstly, let's define the raw data paths and the map of Switzerland. We crop the original data to a smaller geographical region because of the high computation costs that global maps require.
+```{r}
+# Path for WorldClim data
+path_worldclim <- "~/data/archive/worldclim_fick_2017/data"
+
+# Path for WATCH-WFDEI data (subdirectory contains the .nc files)
+path_watch <- "~/data/archive/wfdei_weedon_2014/data"
+
+# Create Switzerland map object
+crop_map <- ne_countries(scale = "medium", 
+                          country = "Switzerland", 
+                          returnclass = "sf")
+
+# Load functions to compute VPD
+source("R/calc_vpd_from_qair.R")
+source("R/calc_vpd_from_vapr.R")
+```
+
+The main parts of the downscaling workflow are the following:
+
+- Calculating VPD from the raw WATCH-WFDEI data (save daily values in files).
+- Calculate average monthly climatology from the WATCH-WFDEI daily data.
+- Read WorldClim data and calculate VPD.
+- Resample WATCH-WFDEI-derived climatology to WorldClim resolution and compute the climatology bias (save bias in files). $VPD_{bias} = VPD_{WATCH} - VPD_{WorldClim}$
+- Resample daily data and substract the bias. $VPD_t = VPD_{WATCH, \; t} - VPD_{bias}$
+
+```{r}
+# Define function to get global monthly climatology
+# (1979-2000 to align with WorldClim)
+
+# Work with data from January only
+month <- "01"
+
+# Read WATCH-WFDEI data from 1979 to 2000
+files_tair <- list.files(paste0(path_watch, "/Tair_daily"),
+                         pattern = paste0("*", month,".nc"),
+                         full.names = TRUE)[1:22]
+files_qair <- list.files(paste0(path_watch, "/Qair_daily"),
+                         pattern = paste0("*", month,".nc"),
+                         full.names = TRUE)[1:22]
+files_psurf <- list.files(paste0(path_watch, "/PSurf_daily"),
+                         pattern = paste0("*", month,".nc"),
+                         full.names = TRUE)[1:22]
+
+# Compute average monthly climatology, parallelized
+cores <- 1
+clim_monthly <- lapply(1:22,
+                       FUN = function(y){
+                         # Read a year's data and crop
+                         tair <- terra::rast(files_tair[y]) |>
+                           terra::crop(terra::vect(crop_map)) - 273.15   # K -> C
+                         qair <- terra::rast(files_qair[y]) |>
+                           terra::crop(terra::vect(crop_map)) 
+                         psurf <- terra::rast(files_psurf[y]) |>
+                           terra::crop(terra::vect(crop_map))
+                         
+                         # Compute VPD
+                         vpd <- calc_vpd_from_qair(t = tair,
+                                                   q = qair,
+                                                   P = psurf)
+                         names(vpd) <- gsub("Tair", "vpd", names(vpd))
+                         names(tair) <- gsub("Tair", "tavg", names(tair))
+                         
+                         # Save daily VPD and temperature calculations at 0.5deg
+                         terra::writeRaster(c(tair, vpd), 
+                                            filename = paste0("data/tair_vpd_daily_",
+                                                              1978+y, month, ".tif"),
+                                            overwrite = TRUE)
+                         
+                         # Compute monthly average
+                         tair_monthly <- tair |>
+                           terra::app(mean, na.rm = TRUE)
+                         names(tair_monthly) <- paste0("tair_", month)
+                         
+                         vpd_monthly <- vpd |>
+                           terra::app(mean, na.rm = TRUE)
+                         names(vpd_monthly) <- paste0("vpd_", month)
+
+
+                         c(tair_monthly, vpd_monthly)
+                       }) |>
+    terra::rast() |>                      # convert to single rast
+    terra::app(fun = function(i, ff) ff(i),
+               cores = cores,
+               ff = function(r){
+                 # Separate temperature and vpd
+                 mean_t <- mean(r[seq(from = 1, to = length(r), by = 2)],
+                                na.rm = TRUE)
+                 mean_vpd <- mean(r[seq(from = 2, to = length(r), by = 2)],
+                                  na.rm = TRUE)
+                 c(mean_t, mean_vpd)
+               })                         # avg over 22 years
+# Match names to WorldClim data
+names(clim_monthly) <- c(paste0("tavg_", month),
+                         paste0("vpd_", month))
+
+# Read WorldClim data
+# Read temperature data and crop
+file_tavg <- paste0(path_worldclim, "/wc2.1_30s_tavg_", month, ".tif")
+tavg <- terra::rast(file_tavg) |>
+  terra::crop(terra::vect(crop_map))
+
+# Read water vapor pressure data and crop
+file_vapr <- paste0(path_worldclim, "/wc2.1_30s_vapr_", month, ".tif")
+vapr <- terra::rast(file_vapr) |>
+  terra::crop(vect(crop_map)) * 1000         # kPa -> Pa
+  
+vpd <- calc_vpd_from_vapr(t = tavg, 
+                          e = vapr)
+names(vpd) <- paste0("vpd_", month)
+clim_monthly_worldclim <- c(tavg, vpd)
+```
+
+
+Now that we have computed the monthly climatology from WATCH-WFDEI and loaded the WorldClim average monthly climatology data, we can move on to compute the bias for the grid with finer spatial resolution.
+```{r}
+# Let's resample the spatial grid of the daily data (1/2 deg) to match
+# the finer WorldClim grid (1/12 deg)
+
+# Resampling computed with bilinear interpolation 
+clim_monthly_resampled <- terra::resample(
+  clim_monthly,            # SpatRaster to be resampled
+  clim_monthly_worldclim)  # SpatRaster with the goal geometry
+
+clim_monthly_resampled <- terra::crop(clim_monthly_resampled,
+                                           clim_monthly_worldclim)
+
+# Calculate climatic bias
+clim_monthly_bias <- clim_monthly_resampled - clim_monthly_worldclim
+
+
+```
+
+Finally, we can de-bias the original daily temperature and vpd using the long-term climatologic trends for the finer grid. We save those results in the data/ folder.
+```{r}
+# Calculate VPD for Switzerland after year 2000
+# Read WATCH-WFDEI data from 2000 to 2018
+files_tair <- list.files(paste0(path_watch, "/Tair_daily"),
+                         pattern = paste0("*", month,".nc"),
+                         full.names = TRUE)[23:40]
+files_qair <- list.files(paste0(path_watch, "/Qair_daily"),
+                         pattern = paste0("*", month,".nc"),
+                         full.names = TRUE)[23:40]
+files_psurf <- list.files(paste0(path_watch, "/PSurf_daily"),
+                         pattern = paste0("*", month,".nc"),
+                         full.names = TRUE)[23:40]
+
+# Compute VPD and temperature for the remaining years of daily data
+cores <- 4
+lapply(seq_along(files_tair),
+       FUN = function(y){
+         # Read a year's data and crop
+         tair <- terra::rast(files_tair[y]) |>
+           terra::crop(terra::vect(crop_map)) - 273.15   # K -> C
+         qair <- terra::rast(files_qair[y]) |>
+           terra::crop(terra::vect(crop_map)) 
+         psurf <- terra::rast(files_psurf[y]) |>
+           terra::crop(terra::vect(crop_map))
+         
+         # Compute VPD
+         vpd <- calc_vpd_from_qair(t = tair,
+                                   q = qair,
+                                   P = psurf)
+         names(vpd) <- gsub("Tair", "vpd", names(vpd))
+         names(tair) <- gsub("Tair", "tavg", names(tair))
+         
+         # Save daily VPD and temperature calculations at 0.5deg
+         terra::writeRaster(c(tair, vpd), 
+                            filename = paste0("data/tair_vpd_daily_",
+                                              2000+y, month, ".tif"),
+                            overwrite = TRUE)
+       })
+
+# Read and resample daily data
+files_daily <- paste0("data/tair_vpd_daily_", 1979:2018, month, ".tif") 
+
+# Define a simple function to de-bias
+debias <- function(r, n){
+  # n: number of days in month
+  # r: raster including 
+  #    t_bias | vpd_bias | t_01 ... t_n | vpd_01 ... vpd_n
+  
+  t <- r[2 + (1:n) ] + r[1]
+  vpd <- r[2 + n + (1:n) ] + r[2]
+  
+  # Return temp and vpd
+  c(t, vpd)
+}
+
+lapply(seq_along(files_daily),
+       FUN = function(y){
+         # Resample daily data with bilinear interpolation to 1/12 deg
+         daily <- terra::rast(files_daily[y]) |>
+           terra::resample(clim_monthly_worldclim) |>
+           terra::crop(clim_monthly_worldclim)
+         
+         # Get number of days in month
+         n <- terra::nlyr(daily)/2
+         
+         # De-bias
+         daily <- terra::app(c(clim_monthly_worldclim, daily),
+                              fun = function(i, ff) ff(i),
+                              cores = cores,
+                              ff = function(r) debias(r, n))
+         
+         # Save in file
+         terra::writeRaster(daily, 
+                            filename = paste0("data/tair_vpd_daily_downscaled_",
+                                              1978+y, month, ".tif"),
+                            overwrite = TRUE)
+       })
+
+```
+
+

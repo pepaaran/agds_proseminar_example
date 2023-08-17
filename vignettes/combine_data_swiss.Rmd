@@ -84,14 +84,7 @@ ggplot() +
 In the next code chunk, we read all WorldClim files, crop the data, compute VPD and save the resulting raster.
 ```{r}
 # Define function to compute VPD
-calc_vpd_from_vapr <- function(values){
-  # Use the raster layers as a vector
-    tc <- values[1]       # temperature in C
-    vapr <- values[2]     # water vapor pressure in Pa
-  
-  # Calculate VPD
-  611.0 * exp( (17.27 * tc)/(tc + 237.3) ) - vapr
-}
+source("R/calc_vpd_from_vapr.R")
 
 process_worldclim <- function(
     data_path,   # path for WorldClim data
@@ -99,28 +92,27 @@ process_worldclim <- function(
     crop_map,    # map from rnaturalearth to crop global map
     filename,    # name for the output file
     cores        # number of cores for parallel computation
-){
+){browser()
   # Read temperature data and crop
-  path_temp <- paste0(data_path, "/wc2.1_30s_tavg_", month, ".tif")
-  temp_worldclim <- terra::rast(path_temp) |>
-    terra::crop(vect(crop_map))
+  path_tavg <- paste0(data_path, "/wc2.1_30s_tavg_", month, ".tif")
+  tavg <- terra::rast(path_tavg) |>
+    terra::crop(terra::vect(crop_map))
   
   # Read water vapor pressure data and crop
   path_vapr <- paste0(data_path, "/wc2.1_30s_vapr_", month, ".tif")
-  vapr_worldclim <- terra::rast(path_vapr) |>
-    terra::crop(vect(crop_map)) / 1000         # kPa -> Pa
+  vapr <- terra::rast(path_vapr) |>
+    terra::crop(vect(crop_map)) * 1000         # kPa -> Pa
   
   # Compute VPD from the WorldClim data
+  vpd <- calc_vpd_from_vapr(tavg, vapr)
   # vpd_worldclim <- c(temp_worldclim, vapr_worldclim) |>
-  #   terra::app(calc_vpd_from_vapr)
-  vpd_worldclim <- c(temp_worldclim, vapr_worldclim) |>
-    terra::app(fun = function(i, ff) ff(i),
-               cores = cores,
-               ff = calc_vpd_from_vapr)        # must export function to the nodes
+  #   terra::app(fun = function(i, ff) ff(i),
+  #              cores = cores,
+  #              ff = calc_vpd_from_vapr)   # must export function to the nodes
   
   # Return a single raster with two layers
-  terra::add(temp_worldclim) <- vpd_worldclim
-  names(temp_worldclim) <- paste0(c("tavg_", "vpd_"), month)
+  terra::add(temp_worldclim) <- vpd
+  names(vpd) <- paste0("vpd_", month)
   temp_worldclim |>
     terra::writeRaster(
       filename = filename,
@@ -134,7 +126,7 @@ for(m in c(paste0("0", 1:9), "10", "11", "12")){
     data_path = "~/data/archive/worldclim_fick_2017/data",
     month = m,
     crop_map = ne_countries(scale = "medium", country = "Switzerland", returnclass = "sf"),
-    filename = paste0("data/wc2.1_30s_CH_tavg_vpd_", m, ".tif"),
+    filename = paste0("data/CH_vpd_", m, ".tif"),
     cores = 1
   )
 }
@@ -164,32 +156,7 @@ for(m in c(paste0("0", 1:9), "10", "11", "12")){
 
 ```{r}
 # Define function to compute VPD
-calc_vpd_from_qair <- function(tc, qair, patm){
-  # Use the raster layers as a vector
-  # tc:   temperature in C
-  # qair: specific humidity in kg/kg
-  # patm: surface  (atmospheric) pressure in Pa
-  
-  ## calculate the mass mixing ratio of water vapor to dry air (dimensionless)
-  wair <- qair / (1 - qair)
-  
-  # Define constants
-  # kR  = 8.3143   # universal gas constant, J/mol/K (Allen, 1973)
-  # kMv = 18.02    # molecular weight of water vapor, g/mol (Tsilingiris, 2008)
-  # kMa = 28.963   # molecular weight of dry air, g/mol (Tsilingiris, 2008)
-  
-  # Calculate water vapor pressure 
-  rv <- 0.4613929  # rv <- kR / kMv
-  rd <- 0.2870663  # rd <- kR / kMa
-  vapr <- patm * wair * rv / (rd + wair * rv)
-  
-  # Calculate VPD
-  611.0 * exp( (17.27 * tc)/(tc + 237.3) ) - vapr
-  
-  ## this empirical equation may lead to negative values for VPD
-  ## (happens very rarely). assume positive...
-  # max( 0.0, vpd )
-}
+source("R/calc_vpd_from_qair.R")
 
 # Define functions to get global monthly climatology
 # (1979-2000 to align with WorldClim)
@@ -252,12 +219,12 @@ plot_worldclim <- function(filename, layer_name){
 
 plot_worldclim("data/wc2.1_30s_CH_tavg_vpd_01.tif",
                layer_name = "tavg_01")
-plot_worldclim("data/wc2.1_30s_CH_tavg_vpd_01.tif",
-               layer_name = "vpd_01")
+plot_worldclim("data/wc2.1_30s_CH_tavg_vpd_08.tif",
+               layer_name = "vpd_08")
 plot_worldclim("data/watch_CH_tavg_01.tif",
                layer_name = "tavg_01")
-plot_worldclim("data/watch_CH_vpd_01.tif",
-               layer_name = "vpd_01")
+plot_worldclim("data/watch_CH_vpd_08.tif",
+               layer_name = "vpd_08")
 
 
 plot_worldclim("data/wc2.1_30s_CH_tavg_vpd_07.tif",
@@ -266,4 +233,149 @@ plot_worldclim("data/wc2.1_30s_CH_tavg_vpd_07.tif",
                layer_name = "vpd_07")
 ```
 
-#
+# Scratch paper to compare VPD calculations
+```{r}
+# Check VPD calculation
+source("R/calc_vpd_from_vapr.R")
+source("R/calc_vpd_from_qair.R")
+
+# Monthly averages are much larger for WATCH-WFDEI than for WorldClim
+
+data_path <- "~/data/archive/wfdei_weedon_2014/data"
+month <- "07"
+crop_map <- ne_countries(scale = "medium", country = "Switzerland", returnclass = "sf")
+
+# Read data from 1979 to 2000
+files_tair <- list.files(paste0(data_path, "/Tair_daily"),
+                         pattern = paste0("*", month,".nc"),
+                         full.names = TRUE)[1:22]
+files_qair <- list.files(paste0(data_path, "/Qair_daily"),
+                         pattern = paste0("*", month,".nc"),
+                         full.names = TRUE)[1:22]
+files_psurf <- list.files(paste0(data_path, "/PSurf_daily"),
+                          pattern = paste0("*", month,".nc"),
+                          full.names = TRUE)[1:22]
+
+y <- 1 # 1979
+tair <- terra::rast(files_tair[y]) |>
+  terra::crop(terra::vect(crop_map)) - 273.15   # K -> C
+qair <- terra::rast(files_qair[y]) |>
+  terra::crop(terra::vect(crop_map)) 
+psurf <- terra::rast(files_psurf[y]) |>
+  terra::crop(terra::vect(crop_map))
+
+# Compute VPD
+vpd <- calc_vpd_from_qair(t = tair,
+                          q = qair,
+                          P = psurf)
+names(vpd) <- gsub("Tair", "vpd", names(vpd))
+
+ggplot() +
+  tidyterra::geom_spatraster(data = vpd[[1]] ) +
+  scale_fill_viridis_c(
+    na.value = NA,
+    name = "Vapor Pressure Deficit (Pa) \n",
+    limits = c(0, 1000)
+  ) +
+  theme_bw() +
+  theme(
+    legend.position = "bottom"
+  )
+
+
+# Now for Worldclim
+data_path <- "~/data/archive/worldclim_fick_2017/data"
+
+path_tavg <- paste0(data_path, "/wc2.1_30s_tavg_", month, ".tif")
+tavg <- terra::rast(path_tavg) |>
+  terra::crop(terra::vect(crop_map))
+
+# Read water vapor pressure data and crop
+path_vapr <- paste0(data_path, "/wc2.1_30s_vapr_", month, ".tif")
+vapr <- terra::rast(path_vapr) |>
+  terra::crop(vect(crop_map)) * 1000         # kPa -> Pa
+
+# Compute VPD from the WorldClim data
+vpd <- calc_vpd_from_vapr(t = tavg, 
+                          e = vapr)
+names(vpd) <- paste0("vpd_", month)
+
+ggplot() +
+  tidyterra::geom_spatraster(data = vpd ) +
+  scale_fill_viridis_c(
+    na.value = NA,
+    name = "Vapor Pressure Deficit (Pa) \n",
+    limits = c(0, 1000)
+  ) +
+  theme_bw() +
+  theme(
+    legend.position = "bottom"
+  )
+```
+
+
+
+# Function to plot data
+```{r}
+plot_temp <- function(r){
+  ggplot() +
+    tidyterra::geom_spatraster(data = r) +
+    scale_fill_viridis_c(
+      na.value = NA,
+      name = "Temperature (C) \n",
+      limits = c(-40, 40)
+      ) +
+    theme_bw() +
+    theme(
+      legend.position = "bottom"
+      )
+}
+
+plot_vpd <- function(r){
+  ggplot() +
+    tidyterra::geom_spatraster(data = r) +
+    scale_fill_viridis_c(
+      na.value = NA,
+      name = "Vapor Pressure Deficit (Pa) \n",
+      limits = c(0, 1000)
+      ) +
+    theme_bw() +
+    theme(
+      legend.position = "bottom"
+      )
+}
+```
+
+
+
+
+
+
+profvis({
+lapply(seq_along(files_daily),
+      FUN = function(y){
+        # Resample daily data with bilinear interpolation to 1/12 deg
+        daily <- terra::rast(files_daily[y]) |>
+          terra::resample(clim_monthly_worldclim) |>
+          terra::crop(clim_monthly_worldclim)
+        
+        # De-bias
+        daily <- terra::app(c(clim_monthly_worldclim, daily),
+                             fun = function(i, ff) ff(i),
+                             cores = cores,
+                             ff = function(r){
+                               n <- (length(r) - 2)/2   # number of days
+                               t <- r[2 + (1:n) ] + r[1]
+                               vpd <- r[2 + n + (1:n) ] + r[2]
+                               
+                               # Return temp and vpd
+                               c(t, vpd)
+                             })
+        
+        # Save in file
+        terra::writeRaster(daily, 
+                           filename = paste0("data/tair_vpd_daily_downscaled_",
+                                             1990+y, month, ".tif"),
+                           overwrite = TRUE)
+      })
+})

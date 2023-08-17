@@ -21,7 +21,7 @@ The data can be downloaded from the IIASA website via ftp for each variable sepa
 - **Qair** is the daily average specific humidity (in kg/kg) at 2m above surface
 - **PSurf** is the daily average surface pressure (in hPa) 
 
-After downloading the data from the IIASA website via ftp, we can read the netCDF files and extract the information we're interested in. For example, `Tair_daily_WFDEI_197901.nc` contains average temperature values for each day of January 1979 and each pixel in a 0.5 degree grid covering the whole globe. Therefore, to get the time series of temperature for a given pixel
+After downloading the data from the IIASA website via ftp, we can read the netCDF files and extract the information we're interested in. For example, `Tair_daily_WFDEI_197901.nc` contains average temperature values for each day of January 1979 and each pixel in a 0.5 degree grid covering the whole globe. Therefore, to get the time series of temperature for a given pixel, we would need to open all files and extract values for just that pixel, then concatenate them all.
 
 Let's start by reading the data for the month of January 1979 only.
 ```{r}
@@ -90,9 +90,14 @@ ggplot() +
 
 As we did for the WorldClim data, we can compute VPD (vapor pressure deficit) from the specific humidity, elevation and temperature data provided in WATCH-WFDEI:
 
-$$ VPD = 0.611 \exp \left({\frac{17.27 T}{T + 237.3}} \right) - P $$
+$$ VPD = 0.611 \exp \left({\frac{17.27 T}{T + 237.3}} \right) - e $$
 
-where $T$ stands for temperature and $P$ for water vapor pressure.
+where $T$ stands for temperature and $e$ for water vapor pressure.
+
+The vapor pressure deficit is the difference between the saturation vapor pressure ($e_s$) and the actual vapor pressure ($e$).
+The first part of the formula computes the saturation vapor pressure, which increases exponentially with warmer temperature. Warm air ca hold considerably more water when saturated than can colder air.
+Specific humidity (Qair) is defined as the ratio of the mass of water vapor in a parcel of air to the total mass of the air, its units are kg/kg.
+
 
 ```{r}
 # Define function to compute VPD

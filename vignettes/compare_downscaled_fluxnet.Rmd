@@ -54,13 +54,15 @@ The time stamp will allow us to compare the measurements in this time-series to 
 
 ### Read FLUXNET data and filter measurements
 
-We first take a look at the data availability at each one of the Swiss sites. We are interested in how many years of data were collected and the general quality of those data. For the Chamau site, 66\% of data is observed, which we can use for comparing. 
+We first take a look at the data availability at each one of the Swiss sites. Davos is the oldest flux sites, with measurements starting in 1997 and 
+We are interested in how many years of data were collected and the general quality of those data. For the Chamau site, 66\% of data is observed, which we can use for comparing. 
 
 ```{r}
 # Define data path
 path_fluxnet <- "~/data/archive/fluxnet_pastorello_2020/data"
 
-dd <- read.csv(paste0(path_fluxnet, "/FLX_CH-Dav_FLUXNET2015_FULLSET_DD_1997-2014_1-4.csv")) |>
+dd <- read.csv(paste0(path_fluxnet, 
+                      "/FLX_CH-Cha_FLUXNET2015_FULLSET_DD_2005-2014_2-4.csv")) |>
   dplyr::select(TIMESTAMP,
                 TA_F,
                 TA_F_QC,
