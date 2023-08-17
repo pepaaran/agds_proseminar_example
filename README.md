@@ -27,8 +27,11 @@ All of the code necessary to reproduce the results in this project is available 
 | 
 ├── renv.lock                <- file to keep package versions for reproducibility
 |
-├── data-raw                 <- folder for data downloaded from the web, unprocessed
-|                               (this folder is never pushed, see .gitignore)
+├── data-raw/                <- folder for data downloaded from the web, unprocessed
+|   |                           (this folder is never pushed, see .gitignore)
+│   ├── wfdei_weedon_2014/
+│   ├── worldclim_fick_2017/
+│   └── fluxnet_pastorello_2020/
 |
 ├── data                     <- folder for data produced by the repository
 │
