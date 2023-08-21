@@ -17,6 +17,9 @@ plot_comparison_site <- function(
     # Remove years before FLUXNET observations
     dplyr::filter(tstep >= min(df_fluxnet$TIMESTAMP)) |>
     
+    # Remove years after FLUXNET observations
+    dplyr::filter(tstep <= max(df_fluxnet$TIMESTAMP)) |>
+    
     # Join FLUXNET data, by date
     dplyr::left_join(
       df_fluxnet,
