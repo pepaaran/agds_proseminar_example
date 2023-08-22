@@ -14,7 +14,7 @@ plot_daily <- function(
                                ifelse(test = day < 9,
                                       yes = paste0("0", day+1),
                                       no = day+1)),
-                  yes = paste0("Downscaled 1/12deg ", 
+                  yes = paste0("Downscaled 30sec ", 
                               regmatches(filename, regexpr("[0-9]+", filename)),
                               ifelse(test = day < 9,
                                      yes = paste0("0", day+1),
@@ -22,9 +22,10 @@ plot_daily <- function(
   
   # Define plot legend, title and range
   if(grepl("tavg", layer_name)){
+    r <- r[[paste0(layer_name, "_tstep=", day)]]
+
     ggplot() +
-      tidyterra::geom_spatraster(data = r[[paste0(layer_name,
-                                                  "_tstep=", day)]] ) +
+      tidyterra::geom_spatraster(data = r ) +
       scale_fill_viridis_c(
         na.value = NA,
         name = "Temperature (C) \n",
@@ -36,13 +37,14 @@ plot_daily <- function(
       ) +
       ggtitle(title)
   } else if(grepl("vpd", layer_name)){
+    r <- r[[paste0(layer_name, "_tstep=", day)]]
+  
     ggplot() +
-      tidyterra::geom_spatraster(data = r[[paste0(layer_name,
-                                                  "_tstep=", day)]] ) +
+      tidyterra::geom_spatraster(data =  r ) +
       scale_fill_viridis_c(
         na.value = NA,
-        name = "Vapor Pressure Deficit (Pa) \n",
-        limits = c(0, 3000)
+        name = "VPD (Pa) \n",
+        limits = c(0, 2000)
       ) +
       theme_bw() +
       theme(
