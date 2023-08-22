@@ -26,25 +26,36 @@ compare_downscaled <- function(
       # Join FLUXNET data, by date
       dplyr::left_join(
         df_fluxnet,
-        by = join_by(tstep == TIMESTAMP))
+        by = join_by(tstep == TIMESTAMP)) |>
+    
+      # Compute difference between observed and downscaled
+      # to save later repeated computations
+      dplyr::mutate(vpd_dif = vpd - VPD_F,
+                    tavg_dif = tavg - TA_F)
     
     # Compute metrics for VPD and temperature
-    c(rmse_vpd = sqrt(mean( (df_joint$vpd - df_joint$VPD_F)^2,
-                            na.rm = TRUE)),
-      bias_vpd = mean( df_joint$vpd - df_joint$VPD_F,
-                       na.rm = TRUE),
+    c(rmse_vpd = sqrt(mean( df_joint$vpd_dif^2, na.rm = TRUE)),
+      
+      bias_vpd = mean( df_joint$vpd_dif, na.rm = TRUE),
+      
       slope_vpd = coef(lm(df_joint$vpd ~ df_joint$VPD_F))[2] |>
         stats::setNames(""),
-      mre_vpd = mean( abs( (df_joint$vpd - df_joint$VPD_F)/df_joint$VPD_F),
-                      na.rm = TRUE),
+      mre_vpd = df_joint |>
+        dplyr::filter(VPD_F != 0) |>
+        dplyr::mutate(rel_error = abs( vpd_dif/VPD_F )) |>
+        dplyr::select(rel_error) |>
+        apply(2, mean, na.rm=TRUE),
+        
+        # mean( abs( (df_joint$vpd_dif)/df_joint$VPD_F),
+        #               na.rm = TRUE),
       
-      rmse_tavg = sqrt(mean( (df_joint$tavg - df_joint$TA_F)^2,
+      rmse_tavg = sqrt(mean( (df_joint$tavg_dif)^2,
                              na.rm = TRUE)),
-      bias_tavg = mean( df_joint$tavg - df_joint$TA_F,
+      bias_tavg = mean( df_joint$tavg_dif,
                         na.rm = TRUE),
       slope_tavg = coef(lm(df_joint$tavg ~ df_joint$TA_F))[2] |>
         stats::setNames(""),
-      mre_tavg = mean( abs( (df_joint$tavg - df_joint$TA_F)/df_joint$TA_F),
+      mre_tavg = mean( abs( (df_joint$tavg_dif)/df_joint$TA_F),
                       na.rm = TRUE)
     ) |>
       round(3)      
