@@ -11,6 +11,13 @@ downscale_t_vpd <- function(
     cores                       # number of cores for parallelisation over pixels
 ){
   
+  # Change format of month
+  if(month < 10){
+    month <- paste0("0", month)
+  } else {
+    month <- as.character(month)
+  }
+  
   if(compute_bias){
     
     # Compute average monthly climatology from WATCH-WFDEI over 1979-2000
