@@ -10,7 +10,7 @@ plot_comparison_site <- function(
     path_fluxnet = path_fluxnet,
     site_code = site_code)
   
-  # Get downscaled data from Davos
+  # Get downscaled data
   df_joint <- df_downscaled |>
     dplyr::filter(ID == site_code) |>
     
@@ -53,27 +53,29 @@ plot_comparison_site <- function(
     xlab("Date") +
     ylab("VPD (Pa)") +
     theme_classic() +
+    theme(legend.position = "bottom", legend.title = element_blank()) +
     labs(title = paste("Downscaling evaluation for ", site_code) )
   
   p2 <- ggplot(df_joint) +
     geom_point(aes(x = VPD_F, y = vpd), alpha = 0.3) +
-    xlab("Measured VPD (Pa) from FLUXNET2015") +
+    xlab("Measured VPD (Pa)") +
     ylab("Downscaled VPD (Pa)") +
     geom_smooth(aes(x = VPD_F, y = vpd),
                 method = "lm") +
     geom_abline(slope = 1, intercept = 0, lty = 2, col = 2) +
     theme_classic() +
+    theme(plot.subtitle = element_text(size = 9)) +
     labs(subtitle = paste("RMSE =", 
                           sqrt(mean( (df_joint$vpd - df_joint$VPD_F)^2,
                                      na.rm = TRUE)) |>
-                            format(),
-                          " Bias =",
+                            round(2),
+                          "   Bias =",
                           mean( df_joint$vpd - df_joint$VPD_F,
                                 na.rm = TRUE) |>
-                            format(),
-                          " Slope = ",
+                            round(2),
+                          "   Slope = ",
                           coef(lm(df_joint$vpd ~ df_joint$VPD_F))[2] |>
-                            format()
+                            round(2)
     ))
   
   # cowplot::plot_grid(p1, p2, ncol = 1)
@@ -92,27 +94,29 @@ plot_comparison_site <- function(
     xlab("Date") +
     ylab("Temperature (C)") +
     theme_classic() +
-    labs(title = "") 
+    theme(legend.position = "bottom", legend.title = element_blank()) +
+    labs(title = "")
   
   p4 <- ggplot(df_joint) +
     geom_point(aes(x = TA_F, y = tavg), alpha = 0.3) +
-    xlab("Measured temperature (C) from FLUXNET2015") +
+    xlab("Measured temperature (C)") +
     ylab("Downscaled temperature (C)") +
     geom_smooth(aes(x = TA_F, y = tavg),
                 method = "lm") +
     geom_abline(slope = 1, intercept = 0, lty = 2, col = 2) +
     theme_classic() +
+    theme(plot.subtitle = element_text(size = 9)) +
     labs(subtitle = paste("RMSE =", 
                           sqrt(mean( (df_joint$tavg - df_joint$TA_F)^2,
                                      na.rm = TRUE)) |>
-                            format(),
-                          " Bias =",
+                            round(2),
+                          "   Bias =",
                           mean( df_joint$tavg - df_joint$TA_F,
                                 na.rm = TRUE) |>
-                            format(),
-                          " Slope = ",
+                            round(2),
+                          "   Slope = ",
                           coef(lm(df_joint$tavg ~ df_joint$TA_F))[2] |>
-                            format()
+                            round(2)
     ))
   
   cowplot::plot_grid(p1, p3, p2, p4, ncol = 2) |> print()

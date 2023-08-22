@@ -26,7 +26,7 @@ This project proposes the integration of daily meteorological data from the WATC
  
 # Data selection
 
-The following datasets were chosen, among a variety of public datasets, because, combined, they allow us to obtain daily values of temperature and vapor pressure deficit at a very fine spatial resolution (30sec or cells of approximately 700m (lon) by 900m (lat) in Switzerland).
+The following datasets were chosen among a variety of public datasets, because, combined, they allow us to obtain daily values of temperature and vapor pressure deficit at a very fine spatial resolution (30sec or cells of approximately 700m (lon) by 900m (lat) in Switzerland).
 
 ## Daily global climate data from WATCH-WFDEI
 
@@ -38,9 +38,9 @@ WATCH-WFDEI provides monthly climate fields at 0.5 degree resolution from 1979 t
 
 The data can be downloaded from the IIASA website via ftp for each variable separately. We used the `src/download_watch_wfdei.sh` script to get the data automatically.
 
-After downloading the data, we can read the netCDF files with the `terra` package and extract the information we're interested in. For example, `Tair_daily_WFDEI_197901.nc` contains average temperature values for each day of January 1979 and each pixel in a 0.5 degree grid (approximately 55x55km cells at the equator and 55x42km at the latitude of Switzerland) covering the whole globe. Therefore, to get the time series of temperature for any given pixel, we would need to open all files and extract values for just that pixel, then concatenate them all.
+After downloading the data, we can read the netCDF files with the `terra` package and extract the information we're interested in. For example, `Tair_daily_WFDEI_197901.nc` contains average temperature values for each day of January 1979 and each pixel in a 0.5 degree grid (approximately 55x55km cells at the equator and 55x42km at the latitude of Switzerland) covering the whole globe.
 
-Let's start by reading the temperature data for the month of January 1979 only and see how it looks. The raster contains a layer per day, but we plot the monthly average.
+Let's start by reading the temperature data for the month of January 1979 only and see how it looks. The raster contains a layer per day, but we plot the monthly average. Since VPD is not a variable in the dataset, we cannot observe it directly.
 ```{r fig.width=7, fig.height=5}
 # Path for WATCH-WFDEI data (directory containing the .nc files)
 path_watch <- "data-raw/wfdei_weedon_2014/Tair_daily"
@@ -57,11 +57,14 @@ ggplot() +
                                terra::app(mean, na.rm = TRUE)) +
   scale_fill_viridis_c(
     na.value = NA,
-    name = "Temperature (deg C) \n"
+    name = "Temperature (deg C) \n",
+    limits = c(-55, 35)
     ) +
   theme_bw() +
   theme(
-    legend.position = "bottom"
+    legend.position = "bottom") +
+  labs(
+    title = "Average January 1979 temperature (WATCH-WFDEI)"
     )
 ```
 
@@ -88,11 +91,15 @@ ggplot() +
   tidyterra::geom_spatraster(data = temp_worldclim) +
   scale_fill_viridis_c(
     na.value = NA,
-    name = "Temperature (deg C) \n"
+    name = "Temperature (deg C) \n",
+    limits = c(-55, 35)
     ) +
   theme_bw() +
   theme(
     legend.position = "bottom"
+    ) +
+  labs(
+    title = "Average January temperature 1970-2000 (WorldClim)"
     )
 ```
 
@@ -298,11 +305,9 @@ p4 <- plot_daily("data/tavg_vpd_daily_downscaled_199710.tif",
 cowplot::plot_grid(p1, p2, p3, p4)
 ```
 
-The downscaled maps of both temperature and VPD values are in similar ranges to the 0.5deg original data. The local variations reflect the topography of Switzerland, as we would have expected. Next, we will compare the downscaled tempearture and VPD to measurements taken at surface level.
+The downscaled maps of both temperature and VPD values are in similar ranges to the 0.5deg original data. The local variations reflect the topography of Switzerland, as we would have expected. Next, we will compare the downscaled temperature and VPD to measurements taken at surface level.
 
 # Data evaluation
-
-- Selection of FLUXNET sites and explanation of site differences
 
 We are interested in daily averages of temperature and VPD from various Swiss FLUXNET sites (see information [here](https://fluxnet.org/sites/site-list-and-pages/). In the following plot, we show the locations of the flux sites in Switzerland. You can hover over the dots to read their names.
 
@@ -315,7 +320,11 @@ fluxnet_sites <- data.frame(
                 "Oesingen grassland", "Oesingen crop"),
   lon = c(8.4104, 9.8559, 8.5378, 8.3644, 7.7319, 7.7337),
   lat = c(47.2102, 46.8153, 47.1158, 47.4783, 47.2858, 47.2864),
-  elv = c(393, 1639, 982, 689, 450, 452)
+  elv = c(393, 1639, 982, 689, 450, 452),
+  mat = c(9.5, 2.8, 7.2, 8.3, 9, 9.8),
+  map = c(1136, 1062, 1651, 1100, 1100, 1155),
+  igbp = c("Grassland", "Evergreen needleleaf forest", "Grassland",
+           "Mixed forest", "Grassland", "Crop")
 )
 
 # Plot locations with leaflet
@@ -327,46 +336,70 @@ leaflet() |>
   fitBounds(lng1 = 5.966667, lng2 = 10.45833,
             lat1 = 45.83333, lat2 = 47.775)
 
+# # Plot site differences
+# ggplot(data = fluxnet_sites) +
+#   geom_point(aes(x = mat, y = map, color = elv, shape = igbp)) +
+#   geom_text(aes(label = site_code, x = mat, y = map),
+#             hjust = 0, vjust = 0) +
+#   theme_classic()
 ```
 
-- Visual comparison
+These 6 sites represent different land cover classes, from grasslands (Chamau, Früebüel and Oensingen 1) and crop fields (Oensingen 2) to mixed (Laegern) and evergreen needleleaf forests (Davos). The Früebüel site is the wettest, with mean annual precipitation of 1650mm, mean annual temperature of 7 $^\text{o}$C and an elevation of 980m. Davos sits highest, at 1600m of elevation, it's cold (3 $^\text{o}$C mean annual temperature) and dryer (1060mm). The remaining 4 sites are at 400-700m of elevation, with mean annual temperatures of 8-10 $^\text{o}$C and precipitation of 1100-1150mm. With this data, we have a good representation of the Swiss Plateau but not so good of mountaineous areas, for which the downscaling is also more complicated due to its topology. For all sites there are at least 6 years of measurements, with the oldest having 18 years of data.
 
-- Discussion
+## Visualisation of time series
 
-> NOTE: In your full report, there should be additional sections containing the modelling and analysis components of the project. 
+We saved the daily downscaled data in files grouped by month and year. Therefore, to get the daily time series of temperature for any given pixel, we need to open all files and extract values for just that pixel, then concatenate them all. Here we extract a time-series of downscaled temperature and VPD for the 30x30sec pixels corresponding to the Swiss FLUXNET sites and save the data frame for later.
+```{r}
+# Load function
+source("R/get_downscaled_time_series.R")
+
+# Extract downscaled daily time series for a given set of sites and years
+daily_downscaled <- get_downscaled_time_series(
+  years = 1997:2014,
+  fluxnet_sites = fluxnet_sites
+)
+
+# Save time series of downscaled data for Swiss sites
+save(daily_downscaled, file = "data/daily_downscaled.rda")
+```
+
+Finally, we can visually compare the downscaled values to the measurements from FLUXNET2015. For simplicity, we will only plot the data from Davos but include all quality measures the table below.
+```{r fig.width = 7, fig.height = 5, warning = FALSE, message = FALSE, fig.align='center'}
+# Load functions to compare and plot data
+source("R/get_fluxnet_data.R")
+source("R/plot_comparison_site.R")
+
+plot_comparison_site(
+  daily_downscaled,
+  path_fluxnet,
+  site_code = "CH-Dav"
+)
+
+```
+
+```{r}
+# Load function to create comparison table
+source("R/compare_downscaled.R")
+
+compare_downscaled(
+  daily_downscaled,
+  path_fluxnet
+) |>
+  knitr::kable()
+```
+
+
+From the previous figure and table, we can conclude that the downscaling of temperature works quite well for all sites, with RMSE values between 1.5 and 2 degrees Celsius. On average, we predict a temperature that is less than 1 degrees Celsius higher than the measured temperature, as indicated by the bias. Nevertheless, there doesn't appear to be any strong systematic error because the slope is close to 1. 
+
+On the contrary, the VPD downscaling is quite faulty. As we observe in the figure, we tend to underestimate VPD in the Davos site, despite capturing seasonal variations in VPD (seen in the time series plots). There is a systematic scaling error of approximately 50\%, shown by the slope of the scatterplot. For all 6 sites, small VPD values are generally overestimated and large VPD values, underestimated.
+
+The error may stem from the calculation of VPD from specific humidity (WATCH-WFDEI) and water vapor pressure (WorldClim), or from the fact that the values provided are averaged over large and heterogeneous regions. The performance in, for example, Chamau is better, which hints that there may be a topological or vegetation type component to our error.
+
+This information and study empowers us to mindfully use these data in future research. We are now aware of the limitations of our data processing and downscaling workflow, enabling the critical analysis of future results that will inherit the uncertainty in the daily data with high spatial resolution.
+
+> NOTE: In your full report, there should be additional sections containing the modelling and statistical analysis components of the project. This example project goes over the data processing steps only.
 
 # Conclusion
 
 # References
-
-
-
-
-# VPD downscaling 
-
-Processing raster data in high resolution is memory and computationally intensive
-```{r eval = FALSE}
-# Load defined functions
-source("R/calc_vpd_from_qair.R")
-source("R/calc_vpd_from_vapr.R")
-source("R/compute_monthly_climatology.R")
-source("R/get_daily_t_vpd.R")
-source("R/get_worldclim_t_vpd.R")
-source("R/debias_t_vpd.R")
-source("R/downscale_t_vpd.R")
-
-# The last function calls the others internally, such that a single function
-# call processes all data for a given month.
-downscale_t_vpd(
-  path_worldclim = "~/data/archive/worldclim_fick_2017/data",
-  path_watch = "~/data/archive/wfdei_weedon_2014/data",
-  crop_map = rnaturalearth::ne_countries(scale = "medium", 
-                                         country = "Switzerland", 
-                                         returnclass = "sf"),
-  month = 2,     # February
-  downscale_years = 1997:2014,
-  cores = 1
-)
-```
-
 
