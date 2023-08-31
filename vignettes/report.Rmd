@@ -1,7 +1,7 @@
 ---
 title: "Downscaling VPD and temperature data"
 author: "Pepa Arán"
-date: Sys.Date()
+date: "2023-08-31"
 output: rmarkdown::html_vignette
 bibliography: references.bib
 ---
@@ -21,7 +21,7 @@ library(leaflet)
 
 # Spatio-temporal downscaling of temperature and VPD data
 
-This report presents an Applied Geo-Data Science project aimed at spatially downscaling daily Vapor Pressure Deficit (VPD) and temperature values to address vegetation modelling questions. By improving the spatial resolution of climatic data, we can gain valuable insights into the relationships between environmental variables and vegetation dynamics at finer scales.
+This report presents an Applied Geo-Data Science project aimed at spatially downscaling daily Vapor Pressure Deficit (VPD) and temperature values to address vegetation modelling questions. By improving the spatial resolution of climatic data, we can gain valuable insights into the relationships between environmental variables and vegetation dynamics at finer scales. Recent literature [@peñuelas2017; @wang2020] indicates a change of paradigm, where warming dominates photosynthesis, rather than CO_2 fertilization. The global rise in temperature, thus also increased VPD, is leading to reduced vegetation growth [@yuan2019]. Understanding this pressing issue with high resolution data is a motivator for the project here presented.
 
 This project proposes the integration of daily meteorological data from the WATCH-WFDEI dataset [@weedon2014] with a finer spatial grid dataset like Worldclim [@fick2017], which provides averaged values over 30 years, to achieve higher spatial resolution. Average daily temperature data is directly provided in both datasets and we will use measurements of specific humidity from WATCH-WFDEI and vapour pressure from Worldclim to compute VPD. A simple de-biasing technique will be employed to combine the two datasets effectively. Finally, the quality of the downscaling will be evaluated through various means, including visualization and comparison with temperature and VPD measurements from FLUXNET2015 [@pastorello2020] sites.
 
