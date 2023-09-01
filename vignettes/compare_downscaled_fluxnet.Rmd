@@ -238,7 +238,7 @@ plot_comparison_site(
 )
 ```
 
-The temperature plot shows that our downscaling works quite well. On average, we predict a temperature that less than 1 degrees Celsius higher than the measured temperature. Nevertheless, there doesn't appear to be any strong systematic error.
+The temperature plot shows that our downscaling works quite well. On average, we predict a temperature that is less than 1 degrees Celsius higher than the measured temperature. Nevertheless, there doesn't appear to be any strong systematic error.
 
 On the contrary, the VPD downscaling is quite faulty, especially for the Davos site. Despite capturing seasonal variations in VPD (seen in the time series plots), we tend to underestimate VPD (on average, by 45 Pa). There is a systematic scaling error of approximately 50\%, shown by the slope of the scatterplot. The error may stem from the calculation of VPD from specific humidity (WATCH-WFDEI) and water vapor pressure (WorldClim), or from the fact that VPD was computed on the coarse grid and then de-biased, rather than computed from the downscaled temperature directly. The performance in Chamau is better, which hints that there may be a topological component to our error. Nevertheless, the RMSE is still quite large, indicating that the downscaling may not be good enough to use these data in future research.
 
