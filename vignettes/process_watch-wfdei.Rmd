@@ -15,18 +15,19 @@ library(ggplot2)
 library(tidyterra)
 ```
 
-WATCH-WFDEI provides monthly climate fields at 0.5 degree resolution from 1979 to 2012. 
-The data can be downloaded from the IIASA website via ftp for each variable separately:
-- **Tair** is the daily average (of 3-hourly) near surface air temperature (in Kelvin) at 2m at time stamp.
+WATCH-WFDEI provides monthly climate fields at 0.5 degree resolution from 1979 to 2012. The following variables are relevant for our project, although many more are provided in the WATCH-WFDEI dataset.
+- **Tair** is the daily average (of 3-hourly) near surface air temperature (in Kelvin) at 2m at time stamp
 - **Qair** is the daily average specific humidity (in kg/kg) at 2m above surface
 - **PSurf** is the daily average surface pressure (in hPa) 
 
-After downloading the data from the IIASA website via ftp, we can read the netCDF files and extract the information we're interested in. For example, `Tair_daily_WFDEI_197901.nc` contains average temperature values for each day of January 1979 and each pixel in a 0.5 degree grid covering the whole globe. Therefore, to get the time series of temperature for a given pixel, we would need to open all files and extract values for just that pixel, then concatenate them all.
+The data can be downloaded from the IIASA website via ftp for each variable separately. We used the `src/download_watch_wfdei.sh` script to get the data automatically.
 
-Let's start by reading the data for the month of January 1979 only.
+After downloading the data, we can read the netCDF files with the `terra` package and extract the information we're interested in. For example, `Tair_daily_WFDEI_197901.nc` contains average temperature values for each day of January 1979 and each pixel in a 0.5 degree grid (approximately 55x55km cells at the equator and 55x42 at the latitude of Spain) covering the whole globe. Therefore, to get the time series of temperature for any given pixel, we would need to open all files and extract values for just that pixel, then concatenate them all.
+
+Let's start by reading the data for the month of January 1979 only and see how it looks. The raster contains a layer per day, but we plot the monthly average.
 ```{r}
 # Path for WATCH-WFDEI data (directory containing the .nc files)
-path_watch <- "~/data/archive/wfdei_weedon_2014/data/Tair_daily"
+path_watch <- "data-raw/wfdei_weedon_2014/data/Tair_daily"
 
 # Get the list of .nc files in the directory
 file_list <- list.files(path_watch, pattern = "*.nc", full.names = TRUE)
