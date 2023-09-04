@@ -196,7 +196,7 @@ calc_vpd_from_vapr <- function(t, e){
 }
 ```
 
-#### Computing VPD with WATCH-WFDEI data \ref{@vpd_watch}
+#### Computing VPD with WATCH-WFDEI data {#vpd_watch}
 
 The [WATCH-WFDEI dataset](https://agupubs.onlinelibrary.wiley.com/doi/full/10.1002/2014WR015638) provides many variables, including:
 
@@ -405,7 +405,7 @@ From the results above, we can conclude that the downscaling of temperature work
 
 On the contrary, the VPD downscaling is quite faulty. As we observe in the figure, we tend to underestimate VPD in the Davos site, despite capturing seasonal variations in VPD (seen in the time series plots). There is a systematic scaling error of approximately 50%, shown by the slope of the scatterplot. For all 6 sites, small VPD values are generally overestimated and large VPD values, underestimated.
 
-The error may stem from the calculation of VPD from specific humidity (WATCH-WFDEI) and water vapor pressure (WorldClim) and the approximation used in section \ref{@vpd_watch}, or from the fact that the values provided are averaged over large and heterogeneous regions. For example, the performance in Chamau is better, which hints that there may be a topological or vegetation type component to our error.
+The error may stem from the calculation of VPD from specific humidity (WATCH-WFDEI) and water vapor pressure (WorldClim) and the approximation used in [this section](#vpd_watch), or from the fact that the values provided are averaged over large and heterogeneous regions. For example, the performance in Chamau is better, which hints that there may be a topological or vegetation type component to our error.
 
 Nevertheless, there is a scatter present in all plots that indicate that our downscaled values have roughly a 10/% error with respect to true values. This error prevents us from using the new dataset with higher spatio-temporal resolution for the investigation of small scale changes in vegetation dynamics.
 
