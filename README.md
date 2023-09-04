@@ -1,17 +1,9 @@
-# AGDS Proseminar - Example project
-This repository serves as a project sample for the AGDS Proseminar. 
+# Proseminar in Geocomputation and Earth Observation - Example project
+This repository serves as a project sample for the Proseminar in Geocomputation and Earth Observation. 
 
 > NOTE: Throughout the proposal, report and slides, there will be notes like this one indicating instructions and tips for your project implementation. You don't need to include such notes in your submission.
 
-Your project should contain the following parts:
-- Introduce a research question related to geography or Earth systems science with a proposal for answering it via a data analysis.
-- Combine at least two data sources for your analysis.
-- Implement a visualisation and a modelling component in your analysis.
-- Document your data analysis in a report, from the motivation of the research question to the discussion of your insights, passing through the data loading, manipulation, analysis and validation.
-- Present your project with a slide deck and exchange feedback with other students.
-- Keep an organized workspace and follow good coding practices and version control.
-
-
+----------
 
 # Spatial downscaling of meteorological variables
 
