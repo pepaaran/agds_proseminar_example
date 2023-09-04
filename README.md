@@ -32,7 +32,8 @@ All of the code necessary to reproduce the results in this project is available 
 |
 ├── vignettes                <- R markdown files
 │   ├── report.Rmd           <- main file containing the submitted report
-│   └── slides.Rmd           <- file creating presentation slides
+│   ├── slides.Rmd           <- file creating presentation slides
+│   └── references.bib       <- bibliography file
 │
 ├── src                      <- bash code for this project, contains scripts for data download
 |
