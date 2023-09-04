@@ -1,5 +1,5 @@
 ---
-title: "Downscaling VPD and temperature data"
+title: "Spatio-temporal downscaling of temperature and VPD data"
 author: "Pepa Arán"
 date: "2023-08-31"
 output: rmarkdown::html_vignette
@@ -18,8 +18,6 @@ library(maps)
 library(rnaturalearth)
 library(leaflet)
 ```
-
-# Spatio-temporal downscaling of temperature and VPD data
 
 This report presents an Applied Geo-Data Science project aimed at spatially downscaling daily Vapor Pressure Deficit (VPD) and temperature values to address vegetation modelling questions. By improving the spatial resolution of climatic data, we can gain valuable insights into the relationships between environmental variables and vegetation dynamics at finer scales. Recent literature [@peñuelas2017; @wang2020] indicates a change of paradigm, where warming dominates photosynthesis, rather than CO_2 fertilization. The global rise in temperature, thus also increased VPD, is leading to reduced vegetation growth [@yuan2019]. Understanding this pressing issue with high resolution data is a motivator for the project here presented.
 
@@ -383,22 +381,31 @@ plot_comparison_site(
 
 ```
 
+The following table shows four summary metrics, for temperature and VPD, to evaluate the performance of the downscaling for each site separately. As usual, we report the root mean squared error (RMSE), the bias and the slope between downscaled and measured values. The fourth metric is a normalized version of the RMSE, where we divide by the standard deviation of the downscaled values, which gives an idea of the error proportional to the magnitude of each variable. This also allows to compare the performance on temperature and VPD directly.
+
 ```{r}
 # Load function to create comparison table
 source("R/compare_downscaled.R")
 
-compare_downscaled(
+metrics <- compare_downscaled(
   daily_downscaled,
   path_fluxnet
-) |>
-  knitr::kable()
+) 
+
+knitr::kable(metrics,
+             col.names = c("RMSE", "Bias", "Slope", "RMSE norm",
+                           "RMSE", "Bias", "Slope", "RMSE norm"
+                           ),
+             digits = 2) |>
+  kableExtra::add_header_above(c(" " = 1, "VPD" = 4, "Temperature" = 4)) |>
+  kableExtra::kable_styling(full_width = TRUE)
 ```
 
-From the previous figure and table, we can conclude that the downscaling of temperature works quite well for all sites, with RMSE values between 1.5 and 2 degrees Celsius. On average, we predict a temperature that is less than 1 degrees Celsius higher than the measured temperature, as indicated by the bias. There doesn't appear to be any strong systematic error because the slope is close to 1.
+From the results above, we can conclude that the downscaling of temperature works quite well for all sites, with RMSE values between 1.5 and 2 degrees Celsius. On average, we predict a temperature that is less than 1 degrees Celsius higher than the measured temperature, as indicated by the bias. There doesn't appear to be any strong systematic error because the slope is close to 1.
 
 On the contrary, the VPD downscaling is quite faulty. As we observe in the figure, we tend to underestimate VPD in the Davos site, despite capturing seasonal variations in VPD (seen in the time series plots). There is a systematic scaling error of approximately 50%, shown by the slope of the scatterplot. For all 6 sites, small VPD values are generally overestimated and large VPD values, underestimated.
 
-The error may stem from the calculation of VPD from specific humidity (WATCH-WFDEI) and water vapor pressure (WorldClim) and the approximation used in section \ref{@vpd_watch}, or from the fact that the values provided are averaged over large and heterogeneous regions. The performance in, for example, Chamau is better, which hints that there may be a topological or vegetation type component to our error.
+The error may stem from the calculation of VPD from specific humidity (WATCH-WFDEI) and water vapor pressure (WorldClim) and the approximation used in section \ref{@vpd_watch}, or from the fact that the values provided are averaged over large and heterogeneous regions. For example, the performance in Chamau is better, which hints that there may be a topological or vegetation type component to our error.
 
 Nevertheless, there is a scatter present in all plots that indicate that our downscaled values have roughly a 10/% error with respect to true values. This error prevents us from using the new dataset with higher spatio-temporal resolution for the investigation of small scale changes in vegetation dynamics.
 
@@ -406,15 +413,13 @@ Nevertheless, there is a scatter present in all plots that indicate that our dow
 
 ## Conclusion
 
-In this project, we sought to downscale monthly Vapor Pressure Deficit (VPD) and temperature data, bridging the gap between coarser datasets and finer temporal scales. Our findings have illuminated significant insights into the effectiveness of our approach, and have also highlighted avenues for refinement and further development.
+In this project, we sought to downscale monthly Vapor Pressure Deficit (VPD) and temperature data, bridging the gap between datasets with high temporal or spatial resolution, but not both. This work has provided insights into the effectiveness of our downscaling approach, and has also highlighted avenues for refinement and further development.
 
-Our investigations have led us to a dual discovery concerning temperature and VPD downscaling. Temperature downscaling exhibited promising results, showcasing the capability of our methodology to effectively enhance spatial and temporal resolution. However, the same cannot be said for VPD downscaling, which yielded less favorable outcomes. This disparity may stem from the intricate nature of VPD, reliant on multiple meteorological variables, making its accurate downscaling a more complicated task.
-
-This information empowers us to mindfully use these data in future research. We are now aware of the limitations of our data processing and downscaling workflow, enabling the critical analysis of future results that will inherit the uncertainty in the daily data with high spatial resolution.
+Temperature downscaling exhibited promising results, showcasing the capability of our methodology to enhance spatial and temporal resolution. However, the same cannot be said for VPD downscaling, which yielded less favorable outcomes. This disparity may stem from the intricate nature of VPD, computed from multiple meteorological variables, making its accurate downscaling a more complicated task.
 
 The consequences of poor downscaling on vegetation modelling analyses are far-reaching. Inaccuracies in downscaled VPD values can cascade into erroneous predictions of plant water stress, transpiration, and ecosystem responses. Many vegetation models are trained on locally measured data like the FLUXNET2015 dataset, but are then upscaled to global values using remote sensing products like WATCH-WFDEI and WorldClim. The bad quality of downscaled data compromises the reliability of vegetation models, hindering our ability to make informed decisions in ecological management, conservation efforts, and climate change impact assessments.
 
-As we look towards improving our processing workflow, multiple approaches emerge. Enhanced data assimilation techniques beyond de-biasing, careful consideration of variable transformations like the equations for VPD, and incorporation of extra topological variables like elevation and aspect and additional meteorological predictors can be explored. For example, we may study the relationship between FLUXNET2015 observations and topological and meteorological variables, together with average cell values from our downscaled values, in order to create a more sophisticated downscaling model based on regression. Moreover, leveraging high-quality ground-based measurements through calibration and validation exercises can potentially mitigate discrepancies between downscaled values and actual observations, leading to more accurate results.
+As we look towards improving our processing workflow, multiple approaches emerge. Enhanced data assimilation techniques beyond de-biasing, careful consideration of variable transformations like the equations for VPD, and incorporation of extra topological variables like elevation and aspect and additional meteorological predictors can be explored. For example, we may study the relationship between FLUXNET2015 observations and topological and meteorological variables, together with average cell values from our downscaled values, in order to create a more sophisticated regression-based downscaling model. Moreover, leveraging high-quality ground-based measurements through calibration and validation exercises can potentially mitigate discrepancies between downscaled values and actual observations, leading to more accurate results.
 
 In conclusion, this geographical data science project has brought us closer to the intricacies of climate data downscaling. While temperature downscaling showcased potential success, the challenges encountered in VPD downscaling emphasize the need for refinement. By continuously improving our workflow and incorporating ground-based measurements, we can bridge the gap between observed reality and downscaled data, enabling more accurate and insightful vegetation modelling analyses.
 
