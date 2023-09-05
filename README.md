@@ -52,7 +52,7 @@ Vegetation responses to environmental factors exhibit significant spatial hetero
 
 Moreover, downscaled climatic data with higher spatial resolution enables more precise identification of ecological transition zones, microclimates, and areas of high ecological sensitivity. This finer spatial representation supports a better understanding of the mechanisms driving vegetation patterns, species distributions, and ecosystem functioning, thereby enhancing our ability to make informed decisions in ecological management and conservation efforts.
 
-#### Leveraging Monthly Climatic Data at a Finer Spatial Grid Dataset:
+#### Leveraging Monthly Climatic Data at a Finer Spatial Grid Dataset
 
 To tackle the challenge of spatial downscaling, we can leverage the strengths of two datasets: the WATCH-WFDEI dataset and Worldclim. The Worldclim dataset provides monthly climatology of temperature and vapour pressure (averaged over a 30-year period), offering valuable insights into long-term climatic patterns at a ~1km grid. On the other hand, WATCH-WFDEI offers monthly temperature and specific humidity data at a coarser spatial grid, enabling us to capture month-to-month variations in climatic conditions. VPD can be directly calculated from vapour pressure or specific humidity using different formulas. By combining these datasets, we can achieve higher spatial resolution for monthly climatic data.
 
@@ -76,17 +76,21 @@ In implementing this proposal, several R packages can be invaluable. For data as
 
 #### Evaluating the Quality of Downscaling
 
-To evaluate the quality of the downscaling process, visualization techniques can provide valuable insights. Comparing downscaled VPD values against observed or higher-resolution data using visualizations, such as time series plots, scatterplots, or spatial maps, can help identify any discrepancies or uncertainties in the downscaled data. These visual assessments can aid in further refining the downscaling methodology and improving the accuracy of vegetation modelling outputs.
+To evaluate the quality of the downscaling process, visualization techniques can provide valuable insights. Comparing downscaled VPD values against observed or higher-resolution data using visualizations, such as time series plots, scatterplots, or spatial maps, can help identify any discrepancies in the downscaled data. 
 
-In conclusion, this report introduces a geographical data science project that aims to downscale monthly VPD to daily values to address vegetation modelling questions. By leveraging spatially coarser climate datasets with better time resolution and employing data assimilation techniques, we can achieve higher spatio-temporal resolution. However, several challenges must be addressed, including data quality, computational requirements, parameterization, and validation. Visual evaluation techniques can assist in assessing the quality of the downscaled data.
+Furthermore, we should compare the processed data to field measurements. The FLUXNET2015 dataset provides daily average observations of both temperature and VPD, from several eddy covariance towers across the world. A variety of metrics can showcase the similarity or disparity between downscaled and measured data, including RMSE, bias, slope... These general metrics will also allow to compare the downscaling quality across geographical locations, in a quantitative way.
+
+In conclusion, these visual and quantitative assessments can aid in further refining the downscaling methodology and improving the accuracy of vegetation modelling outputs.
 
 #### Potential Challenges
 
 During the completion of this project, several challenges may arise. These challenges include:
 
-a) Data quality: Ensuring the accuracy and consistency of the input datasets is crucial for reliable downscaled VPD and temperature values. Addressing potential biases, errors, or missing data in both WATCH-WFDEI and Worldclim datasets will be critical.
+a) Data quality: Ensuring the accuracy and consistency of the input datasets is crucial for reliable downscaled VPD and temperature values. Addressing potential biases, errors, or missing data in both WATCH-WFDEI, Worldclim and FLUXNET2015 datasets will be necessary.
 
 b) Computational requirements: Generating downscaled monthly values at a high spatio-temporal resolution can be computationally intensive. Planning the project execution with the runtimes in mind and developing the code with subsets of the data will help to complete it in time.
 
 c) Validation: Determining appropriate methods for the data assimilation techniques and validating the downscaled values against ground-based observations or higher-resolution datasets will be essential to assess the quality and accuracy of the results.
 
+
+In summary, this report introduces a geographical data science project that aims to downscale VPD and temperature to high-resolution daily values to address vegetation modelling questions. By leveraging several climate datasets with complementing spatial and time resolution and employing simple de-biasing techniques, we can achieve higher spatio-temporal resolution. However, several challenges must be addressed, including data quality, computational requirements, and validation. Various evaluation techniques will assist in assessing the quality of the downscaled data.
