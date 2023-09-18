@@ -20,13 +20,13 @@ library(leaflet)
 library(patchwork)
 ```
 
-This report presents an Applied Geo-Data Science project aimed at spatially downscaling daily Vapor Pressure Deficit (VPD) and temperature values to address vegetation modelling questions. By improving the spatial resolution of climatic data, we can gain valuable insights into the relationships between environmental variables and vegetation dynamics at finer scales. Recent literature [@peñuelas2017; @wang2020] indicates a change of paradigm, where warming dominates photosynthesis, rather than CO_2 fertilization. The global rise in temperature, thus also increased VPD, is leading to reduced vegetation growth [@yuan2019]. Understanding this pressing issue with high resolution data is a motivator for the project here presented.
+This report presents an Applied Geo-Data Science project aimed at spatially downscaling daily Vapor Pressure Deficit (VPD) and temperature values to address vegetation modelling questions. By improving the spatial resolution of climatic data, we can gain valuable insights into the relationships between environmental variables and vegetation dynamics at finer scales. Recent literature [@peñuelas2017; @wang2020] indicates a change of paradigm, where warming dominates photosynthesis, rather than CO$_2$ fertilization. The global rise in temperature, thus also increased VPD, is leading to reduced vegetation growth [@yuan2019]. Understanding this pressing issue with high resolution data is a motivator for the project here presented.
 
 This project proposes the integration of daily meteorological data from the WATCH-WFDEI dataset [@weedon2014] with a finer spatial grid dataset like Worldclim [@fick2017], which provides averaged values over 30 years, to achieve higher spatial resolution. Average daily temperature data is directly provided in both datasets and we will use measurements of specific humidity from WATCH-WFDEI and vapour pressure from Worldclim to compute VPD. A simple de-biasing technique will be employed to combine the two datasets effectively. Finally, the quality of the downscaling will be evaluated through various means, including visualization and comparison with temperature and VPD measurements from FLUXNET2015 [@pastorello2020] sites.
 
 ## Data selection
 
-The following datasets were chosen among a variety of public datasets, because, combined, they allow us to obtain daily values of temperature and vapor pressure deficit at a very fine spatial resolution (30sec or cells of approximately 700m (lon) by 900m (lat) in Switzerland).
+The following datasets were chosen among a variety of public datasets, because, combined, they allow us to obtain daily values of temperature and vapor pressure deficit at a very fine spatial resolution (30 seconds or cells of approximately 700m (lon) by 900m (lat) in Switzerland).
 
 ### Daily global climate data from WATCH-WFDEI
 
@@ -38,9 +38,9 @@ WATCH-WFDEI provides monthly climate fields at 0.5 degree resolution from 1979 t
 
 The data can be downloaded from the IIASA website via ftp for each variable separately. We used the `src/download_watch_wfdei.sh` script to get the data automatically.
 
-After downloading the data, we can read the netCDF files with the `terra` package and extract the information we're interested in. For example, `Tair_daily_WFDEI_197901.nc` contains average temperature values for each day of January 1979 and each pixel in a 0.5 degree grid (approximately 55x55km cells at the equator and 55x42km at the latitude of Switzerland) covering the whole globe.
+After downloading the data, we can read the netCDF files with the `terra` package and extract the information we are interested in. For example, `Tair_daily_WFDEI_197901.nc` contains average temperature values for each day of January 1979 and each pixel in a 0.5 degree grid (approximately 55x55km cells at the equator and 55x42km at the latitude of Switzerland) covering the whole globe.
 
-As an example, we read and show the temperature data for the month of January 1979 only. The raster contains a layer per day, but we plot the monthly average. We also present the January 1979 monthly average values for specific humidity and surface pressure, since VPD is not a variable in the dataset.
+As an example, we read and show the temperature data for the month of January 1979 only. The raster contains a layer per day, but we plot the monthly average. We also present the  daily average values for specific humidity and surface pressure on the 1st of January 1979, since VPD is not a variable in the dataset.
 
 ```{r fig.width=7, fig.height=5}
 # Path for WATCH-WFDEI data (directory containing the .nc files)
@@ -53,7 +53,7 @@ temp_watch <- terra::rast(paste0(path_watch,
 # Plot month averages
 ggplot() +
   tidyterra::geom_spatraster(data = temp_watch |>
-                               terra::app(mean, na.rm = TRUE)) +
+                               terra::subset(1)) +
   scale_fill_viridis_c(
     na.value = NA,
     name = "Temperature (deg C) \n",
@@ -63,7 +63,7 @@ ggplot() +
   theme(
     legend.position = "bottom") +
   labs(
-    title = "Average January 1979 temperature (WATCH-WFDEI)"
+    title = "1st January 1979 temperature (WATCH-WFDEI)"
     )
 ```
 
@@ -79,7 +79,7 @@ patm_watch <- terra::rast(paste0(path_watch,
 # Plot variables informing VPD
 p_qair <- ggplot() +
   tidyterra::geom_spatraster(data = qair_watch |>
-                               terra::app(mean, na.rm = TRUE)) +
+                               terra::subset(1)) +
   scale_fill_viridis_c(
     na.value = NA,
     name = "Specific humidity (kg/kg) \n",
@@ -92,7 +92,7 @@ p_qair <- ggplot() +
 
 p_patm <- ggplot() +
   tidyterra::geom_spatraster(data = patm_watch |>
-                               terra::app(mean, na.rm = TRUE)) +
+                               terra::subset(1)) +
   scale_fill_viridis_c(
     na.value = NA,
     name = "Surface pressure (Pa) \n",
@@ -105,7 +105,7 @@ p_patm <- ggplot() +
 
 patchw <- p_qair + p_patm
 patchw + plot_annotation(
-  title = "Average January 1979 specific humidity and pressure (WATCH-WFDEI)"
+  title = "1st January 1979 specific humidity and pressure (WATCH-WFDEI)"
 )
 ```
 
@@ -138,12 +138,12 @@ p_temp <- ggplot() +
 
 ### Monthly climatology global maps from WorldClim
 
-The WorldClim dataset contains historical climate data for the period 1970-2000, available at various spatial resolutions. The finest, 30sec gridded data from WorldClim can be directly downloaded from <https://www.worldclim.org/data/worldclim21.html> as .zip files. We are interested in the following variables:
+The WorldClim dataset contains historical climate data for the period 1970-2000, available at various spatial resolutions. The finest, 30" gridded data from WorldClim can be directly downloaded from <https://www.worldclim.org/data/worldclim21.html> as .zip files. We are interested in the following variables:
 
 -   **tavg**: average monthly temperature ($^\text{o}$C)
 -   **vapr**: water vapor pressure (kPa)
 
-For each variable, 12 .tif files are downloaded. Each file from WorldClim contains the monthly average of a single climatic variable across the whole globe, in pixels of 30s (900x900m at the equator and 900x700m in Switzerland). To highlight the magnitude of our downscaling task, it's worth mentioning that each WATCH-WFDEI pixel contains approximately 120 WorldClim pixels.
+For each variable, 12 .tif files are downloaded. Each file from WorldClim contains the monthly average of a single climatic variable across the whole globe, in pixels of 30 seconds (900x900m at the equator and 900x700m in Switzerland). To highlight the magnitude of our downscaling task, it is worth mentioning that each WATCH-WFDEI pixel contains approximately 120 WorldClim pixels.
 
 Below we show the average temperature and water vapor pressure across the globe in January, between the years 1970-2000.
 
@@ -159,7 +159,7 @@ ggplot() +
   tidyterra::geom_spatraster(data = temp_worldclim) +
   scale_fill_viridis_c(
     na.value = NA,
-    name = "Temperature (deg C) \n",
+    name = expression(paste("Temperature ("^o, "C)")),
     limits = c(-55, 35)
     ) +
   theme_bw() +
@@ -201,15 +201,15 @@ Due to the fine spatial resolution of the WorldClim dataset, performing calculat
 
 The FLUXNET2015 dataset includes continuous measurements of ecosystem fluxes (CO2, water vapor, latent heat...) and physical variables (air temperature, precipitation, radiation...), from 212 sites around the world and in high temporal resolution (half-hourly, daily, monthly...). We will use these data as validation, because we want the downscaled data to approximate local measurements as closely as possible.
 
-To download the data, it's necessary to create an AMERIFLUX account. After logging in, the data can be directly downloaded in .zip files from <https://fluxnet.org/data/download-data/>, filtering for the 6 Swiss sites with the prefix CH. All variables are described in the table [here](https://fluxnet.org/data/fluxnet2015-dataset/fullset-data-product/) and in the [AGDS I book](https://geco-bern.github.io/agds/datawrangling.html#example-data).
+To download the data, it is necessary to create an AMERIFLUX account. After logging in, the data can be directly downloaded in .zip files from <https://fluxnet.org/data/download-data/>, filtering for the 6 Swiss sites with the prefix CH. All variables are described in the table [here](https://fluxnet.org/data/fluxnet2015-dataset/fullset-data-product/) and in the [AGDS I book](https://geco-bern.github.io/agds/datawrangling.html#example-data).
 
 We are interested in the following variables from the daily files (DD):
 
--   TIMESTAMP: Time stamp in short format (YYYYMMDDHHMM).
--   TA_F: Air temperature (in $^\text{o}$C), averaged from half-hourly data into daily data and gap-filled.
--   TA_F_QC: Quality flag for TA_F, indicating the fraction between 0-1 of measured temperature vs gap-filled data. 1 corresponds to measured data only.
--   VPD_F: Vapor Pressure Deficit (in hPa), averaged from harlf-hourly data into daily data and gap-filled.
--   VPD_F_QC: Quality flag for VPD_F, indicating the fraction between 0-1 of measured VPD vs gap-filled data. 1 corresponds to measured data only.
+-   **TIMESTAMP**: Time stamp in short format (YYYYMMDDHHMM).
+-   **TA_F**: Air temperature (in $^\text{o}$C), averaged from half-hourly data into daily data and gap-filled.
+-   **TA_F_QC**: Quality flag for TA_F, indicating the fraction between 0-1 of measured temperature vs gap-filled data. 1 corresponds to measured data only.
+-   **VPD_F**: Vapor Pressure Deficit (in hPa), averaged from harlf-hourly data into daily data and gap-filled.
+-   **VPD_F_QC**: Quality flag for VPD_F, indicating the fraction between 0-1 of measured VPD vs gap-filled data. 1 corresponds to measured data only.
 
 The time stamp allows to compare the measurements in this time-series to daily values from the downscaled raster files. Furthermore, we can filter the temperature and VPD time-series to retain only measured data, thus avoiding the comparison of our downscaled WATCH-WFDEI data with downscaled ERA5 data (which the FLUXNET product uses for gap filling).
 
@@ -229,12 +229,13 @@ dd <- read.csv(paste0(path_fluxnet,
                 TA_F_QC,
                 VPD_F,
                 VPD_F_QC) |>
-  dplyr::mutate(TIMESTAMP = as.Date(strptime(TIMESTAMP, format = "%Y%m%d")))
+  dplyr::mutate(TIMESTAMP = as.Date(strptime(TIMESTAMP, format = "%Y%m%d")),
+                VPD_F = VPD_F * 100)    # hPa -> Pa
 
 # Prepare data for plotting
 dd_plot <- data.frame(TIMESTAMP = dd$TIMESTAMP,
-                      variable = c(rep("Temperature (C)", nrow(dd)),
-                                   rep("VPD (hPa)", nrow(dd))),
+                      variable = c(rep("Temperature (deg C)", nrow(dd)),
+                                   rep("VPD (Pa)", nrow(dd))),
                       value = c(dd$TA_F,
                                 dd$VPD_F),
                       qc = c(dd$TA_F_QC,
@@ -336,7 +337,7 @@ Here we present the full workflow for the project, from raw raster data to the d
 -   Resample WATCH-WFDEI-derived climatology to WorldClim resolution and compute the climatology bias (save bias in files for future use). That is, for temperature (analogously for VPD), $$T_{\text{bias}} = T_{\text{WATCH}} - T_{\text{WorldClim}}$$
 -   Resample daily data and substract the bias. $$T_t = T_{\text{WATCH}, \; t} - T_{\text{bias}}$$
 
-We implemented the whole downscaling workflow, from raw data to the final downscaled temperature and VPD, saved in .tif files, into a function called `downscale_t_vpd()`. Because of the raw data structure, it's most efficient to separate all computations by month. That way, the WorldClim data don't need to be loaded repeatedly and the monthly climatology from WATCH-WFDEI is computed and directly used in the code, reducing runtime. Our function also performs all the unit changes and VPD calculations and saves daily values of temperature and VPD at 0.5$^o$ resolution in the `data/` folder, for years 1979-2018, to be processed later. Finally, for the time interval indicated as argument, the data are de-biased and the downscaled values saved. 
+We implemented the whole downscaling workflow, from raw data to the final downscaled temperature and VPD, saved in .tif files, into a function called `downscale_t_vpd()`. Because of the raw data structure, it is most efficient to separate all computations by month. That way, the WorldClim data do not need to be loaded repeatedly and the monthly climatology from WATCH-WFDEI is computed and directly used in the code, reducing runtime. Our function also performs all the unit changes and VPD calculations and saves daily values of temperature and VPD at 0.5$^{\text{o}}$ resolution in the `data/` folder, for years 1979-2018, to be processed later. Finally, for the time interval indicated as argument, the data are de-biased and the downscaled values saved. 
 
 ```{r eval=FALSE}
 # This function contains the whole workflow to downscale daily VPD and
@@ -464,28 +465,14 @@ for(m in 1:12){
 Here we compare the output data to the original WATCH-WFDEI map of October 1st, 1997. The data for the month of October is better suited to perform a visual evaluation of the downscaling because of the state of vegetation and climate in the northern hemisphere. VPD values in winter are fairly uniform across Switzerland and the naked eye could not distinguish whether downscaled values are sensible or not.
 
 ```{r fig.width=7, fig.height=5}
-source("R/plot_daily.R")
+source("R/plot_daily_comparison.R")
 
-# Plot original daily average temperature
-p1 <- plot_daily("data/tavg_vpd_daily_199710.tif",
-           layer_name = "tavg", day = 0)
-
-# Plot downscaled temperature
-p2 <- plot_daily("data/tavg_vpd_daily_downscaled_199710.tif",
-           layer_name = "tavg", day = 0)
-
-# Plot original daily average VPD
-p3 <- plot_daily("data/tavg_vpd_daily_199710.tif",
-           layer_name = "vpd", day = 0)
-
-# Plot downscaled VPD
-p4 <- plot_daily("data/tavg_vpd_daily_downscaled_199710.tif",
-           layer_name = "vpd", day = 0)
-
-(p1 + p2) / (p3 + p4)
+plot_daily_comparison(year = 1997,
+                      month = 10,
+                      day = 1)
 ```
 
-The downscaled maps of both temperature and VPD values are in similar ranges to the 0.5$^o$ original data. The local variations reflect the topography of Switzerland, as we would have expected. Next, we will compare the downscaled temperature and VPD to measurements taken at surface level.
+The downscaled maps of both temperature and VPD values are in similar ranges to the 0.5$^{\text{o}}$ original data. The local variations reflect the topography of Switzerland, as we would have expected. Next, we will compare the downscaled temperature and VPD to measurements taken at surface level.
 
 ## Data evaluation
 
@@ -525,11 +512,11 @@ leaflet() |>
 #   theme_classic()
 ```
 
-These 6 sites represent different land cover classes, from grasslands (Chamau, Früebüel and Oensingen 1) and crop fields (Oensingen 2) to mixed (Laegern) and evergreen needleleaf forests (Davos). The Früebüel site is the wettest, with mean annual precipitation of 1650mm, mean annual temperature of 7 $^\text{o}$C and an elevation of 980m. Davos sits highest, at 1600m of elevation, it's cold (3 $^\text{o}$C mean annual temperature) and dryer (1060mm). The remaining 4 sites are at 400-700m of elevation, with mean annual temperatures of 8-10 $^\text{o}$C and precipitation of 1100-1150mm. With this data, we have a good representation of the Swiss Plateau but not so good of mountaineous areas, for which the downscaling is also more complicated due to its topology. For all sites there are at least 6 years of measurements, with the oldest having 18 years of data.
+These 6 sites represent different land cover classes, from grasslands (Chamau, Früebüel and Oensingen 1) and crop fields (Oensingen 2) to mixed (Laegern) and evergreen needleleaf forests (Davos). The Früebüel site is the wettest, with mean annual precipitation of 1650mm, mean annual temperature of 7 $^\text{o}$C and an elevation of 980m. Davos sits highest, at 1600m of elevation, it is cold (3 $^\text{o}$C mean annual temperature) and dryer (1060mm). The remaining 4 sites are at 400-700m of elevation, with mean annual temperatures of 8-10 $^\text{o}$C and precipitation of 1100-1150mm. With this data, we have a good representation of the Swiss Plateau but not so good of mountaineous areas, for which the downscaling is also more complicated due to its topology. For all sites there are at least 6 years of measurements, with the oldest having 18 years of data.
 
 ### Visualisation of time series
 
-We saved the daily downscaled data in files grouped by month and year. Therefore, to get the daily time series of temperature for any given pixel, we need to open all files and extract values for just that pixel, then concatenate them all. Here we extract a time-series of downscaled temperature and VPD for the 30x30sec pixels corresponding to the Swiss FLUXNET sites and save the data frame for later.
+We saved the daily downscaled data in files grouped by month and year. Therefore, to get the daily time series of temperature for any given pixel, we need to open all files and extract values for just that pixel, then concatenate them all. Here we extract a time-series of downscaled temperature and VPD for the 30x30" pixels corresponding to the Swiss FLUXNET sites and save the data frame for later.
 
 ```{r}
 # Load function
@@ -580,7 +567,7 @@ knitr::kable(metrics,
   kableExtra::kable_styling(full_width = TRUE)
 ```
 
-From the results above, we can conclude that the downscaling of temperature works quite well for all sites, with RMSE values between 1.5 and 2 $^{o}$C. On average, we predict a temperature that is less than 1 degrees Celsius higher than the measured temperature, as indicated by the bias. There doesn't appear to be any strong systematic error because the slope is close to 1.
+From the results above, we can conclude that the downscaling of temperature works quite well for all sites, with RMSE values between 1.5 and 2 $^{o}$C. On average, we predict a temperature that is less than 1 degree Celsius higher than the measured temperature, as indicated by the bias. There does not appear to be any strong systematic error because the slope is close to 1.
 
 On the contrary, the VPD downscaling is quite faulty. As we observe in the figure, we tend to underestimate VPD in the Davos site, despite capturing seasonal variations in VPD (seen in the time series plots). There is a systematic scaling error of approximately 50%, shown by the slope of the scatterplot. For all 6 sites, small VPD values are generally overestimated and large VPD values, underestimated.
 
