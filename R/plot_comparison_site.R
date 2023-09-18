@@ -92,15 +92,15 @@ plot_comparison_site <- function(
     geom_line(aes(x = tstep, y = value, col = origin),
               alpha = 0.5) +
     xlab("Date") +
-    ylab("Temperature (C)") +
+    ylab(expression(paste("Temperature ("^o, "C)"))) +
     theme_classic() +
     theme(legend.position = "bottom", legend.title = element_blank()) +
     labs(title = "")
   
   p4 <- ggplot(df_joint) +
     geom_point(aes(x = TA_F, y = tavg), alpha = 0.3) +
-    xlab("Measured temperature (C)") +
-    ylab("Downscaled temperature (C)") +
+    xlab(expression(paste("Measured temperature ("^o, "C)"))) +
+    ylab(expression(paste("Downscaled temperature ("^o, "C)"))) +
     geom_smooth(aes(x = TA_F, y = tavg),
                 method = "lm") +
     geom_abline(slope = 1, intercept = 0, lty = 2, col = 2) +
