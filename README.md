@@ -13,7 +13,7 @@ All of the code necessary to reproduce the results in this project is available 
 
 ```
 ├── README.md                <- The top-level README includes instructions to use this repository
-|                               and the project proposal for the AGDS Proseminar
+|                               and the project proposal for the Proseminar
 │
 ├── agds_proseminar_example.Rproj    <- R project file
 | 
