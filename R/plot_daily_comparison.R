@@ -38,10 +38,11 @@ plot_daily_comparison <- function(
     ) +
     ggplot2::xlim(xlim) +
     ggplot2::ylim(ylim) +
-    theme(legend.position = "none") +
     labs(
       subtitle = expression(paste("Original data (0.5"^o, ")"))
-    )
+    ) + 
+    theme_bw() +
+    theme(legend.position = "none")
   
   p2 <- ggplot() +
     tidyterra::geom_spatraster(data = r_downscaled[[1]]) +  # temp, downscaled
@@ -54,7 +55,8 @@ plot_daily_comparison <- function(
     ggplot2::ylim(ylim) +
     labs(
       subtitle = "Downscaled data (30\")"
-    )
+    ) + 
+    theme_bw()
   
   p3 <- ggplot() +
     tidyterra::geom_spatraster(data = r[[2]]) +           # vpd, original
@@ -64,6 +66,7 @@ plot_daily_comparison <- function(
     ) +
     ggplot2::xlim(xlim) +
     ggplot2::ylim(ylim) +
+    theme_bw() + 
     theme(legend.position = "none")
   
   p4 <- ggplot() +
@@ -74,7 +77,8 @@ plot_daily_comparison <- function(
       limits = vpd_lim
     ) +
     ggplot2::xlim(xlim) +
-    ggplot2::ylim(ylim)
+    ggplot2::ylim(ylim) + 
+    theme_bw()
   
   # Return plots in a mosaic
   p <- (p1 + p2) / (p3 + p4)

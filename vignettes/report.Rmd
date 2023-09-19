@@ -504,12 +504,18 @@ leaflet() |>
   fitBounds(lng1 = 5.966667, lng2 = 10.45833,
             lat1 = 45.83333, lat2 = 47.775)
 
-# # Plot site differences
-# ggplot(data = fluxnet_sites) +
-#   geom_point(aes(x = mat, y = map, color = elv, shape = igbp)) +
-#   geom_text(aes(label = site_code, x = mat, y = map),
-#             hjust = 0, vjust = 0) +
-#   theme_classic()
+```
+
+```{r eval = FALSE, echo = FALSE}
+# Plot site differences
+ggplot(data = fluxnet_sites) +
+  geom_point(aes(x = mat,                 # Mean annual temperature
+                 y = map,                 # Mean annual precipitation
+                 color = elv,             # Elevation
+                 shape = igbp)) +         # Plant functional type
+  geom_text(aes(label = site_code, x = mat, y = map),
+            hjust = 0, vjust = 0) +
+  theme_classic()
 ```
 
 These 6 sites represent different land cover classes, from grasslands (Chamau, Früebüel and Oensingen 1) and crop fields (Oensingen 2) to mixed (Laegern) and evergreen needleleaf forests (Davos). The Früebüel site is the wettest, with mean annual precipitation of 1650mm, mean annual temperature of 7 $^\text{o}$C and an elevation of 980m. Davos sits highest, at 1600m of elevation, it is cold (3 $^\text{o}$C mean annual temperature) and dryer (1060mm). The remaining 4 sites are at 400-700m of elevation, with mean annual temperatures of 8-10 $^\text{o}$C and precipitation of 1100-1150mm. With this data, we have a good representation of the Swiss Plateau but not so good of mountaineous areas, for which the downscaling is also more complicated due to its topology. For all sites there are at least 6 years of measurements, with the oldest having 18 years of data.
