@@ -19,6 +19,8 @@ All of the code necessary to reproduce the results in this project is available 
 | 
 ├── renv.lock                <- file to keep package versions for reproducibility
 |
+├── .gitignore               <- file indicating which files should be ignored when pushing
+|
 ├── data-raw/                <- folder for data downloaded from the web, unprocessed
 |   |                           (this folder is never pushed, see .gitignore)
 │   ├── wfdei_weedon_2014/
