@@ -54,11 +54,11 @@ Moreover, downscaled climatic data with higher spatial resolution enables more p
 
 #### Leveraging Monthly Climatic Data at a Finer Spatial Grid Dataset
 
-To tackle the challenge of spatial downscaling, we can leverage the strengths of two datasets: the WATCH-WFDEI dataset and Worldclim. The Worldclim dataset provides monthly climatology of temperature and vapour pressure (averaged over a 30-year period), offering valuable insights into long-term climatic patterns at a ~1km grid. On the other hand, WATCH-WFDEI offers monthly temperature and specific humidity data at a coarser spatial grid, enabling us to capture month-to-month variations in climatic conditions. VPD can be directly calculated from vapour pressure or specific humidity using different formulas. By combining these datasets, we can achieve higher spatial resolution for monthly climatic data.
+To tackle the challenge of spatial downscaling, we can leverage the strengths of two datasets: the WATCH-WFDEI dataset and Worldclim. The Worldclim dataset provides monthly climatology of temperature and vapor pressure (averaged over a 30-year period), offering valuable insights into long-term climatic patterns at a ~1km grid. On the other hand, WATCH-WFDEI offers daily temperature and specific humidity data at a coarser spatial grid, enabling us to capture day-to-day variations in climatic conditions. VPD can be directly calculated from vapor pressure, or from surface pressure and specific humidity using different formulas. By combining these datasets, we can achieve higher spatial resolution for daily climatic data.
 
 #### Proposal for Combining Datasets and Data Assimilation Techniques
 
-To achieve the desired spatio-temporal resolution, we propose integrating the monthly WATCH-WFDEI data with the higher spatial resolution of Worldclim. The workflow for the downscaling temperature consists of:
+To achieve the desired spatio-temporal resolution, we propose integrating the daily WATCH-WFDEI data with the higher spatial resolution of Worldclim. The workflow for the downscaling of temperature consists of:
 
 1. Derive the WATCH_WFDEI monthly climatology at 0.5 degree resolution, to be compared with the WorldClim climatology.
 
@@ -68,11 +68,9 @@ To achieve the desired spatio-temporal resolution, we propose integrating the mo
 
 4. Compare the downscaled temperature against site-level measurements.
 
-To downscale VPD Compute VPD from the specific humidity (WATCH-WFDEI) and from the vapour pressure (WorldClim).
+To downscale VPD, start by computing WorldClim-derived VPD from vapor pressure values and WATCH-WFDEI-derived VPD from specific humidity and total surface pressure. Then, follow the same workflow as for temperature.
 
-Promising data assimilation techniques, such as the Ensemble Kalman Filter or variational methods, can be employed to merge the two datasets effectively. These techniques allow for the combination of different datasets while accounting for uncertainties and preserving the spatial and temporal characteristics of the resulting downscaled VPD values.
-
-In implementing this proposal, several R packages can be invaluable. For data assimilation, packages like nloptr and ncdf4 can aid in optimization and reading NetCDF files, respectively. Additionally, packages such as raster and sp provide functionalities for spatial data handling and manipulation, while ggplot2 enables high-quality visualizations.
+In implementing this proposal, several R packages can be useful. For data assimilation, the package `ncdf4` can aid in optimization and reading NetCDF files, respectively. Additionally, packages such as `terra`, `raster` and `sp` provide functionalities for spatial data handling and manipulation, while `ggplot2` and `leaflet` enable high-quality visualizations.
 
 #### Evaluating the Quality of Downscaling
 
@@ -80,7 +78,7 @@ To evaluate the quality of the downscaling process, visualization techniques can
 
 Furthermore, we should compare the processed data to field measurements. The FLUXNET2015 dataset provides daily average observations of both temperature and VPD, from several eddy covariance towers across the world. A variety of metrics can showcase the similarity or disparity between downscaled and measured data, including RMSE, bias, slope... These general metrics will also allow to compare the downscaling quality across geographical locations, in a quantitative way.
 
-In conclusion, these visual and quantitative assessments can aid in further refining the downscaling methodology and improving the accuracy of vegetation modelling outputs.
+In conclusion, these visual and quantitative assessments can aid in further refining the downscaling methodology and ultimately improving the accuracy of vegetation modelling outputs.
 
 #### Potential Challenges
 
@@ -92,5 +90,6 @@ b) Computational requirements: Generating downscaled monthly values at a high sp
 
 c) Validation: Determining appropriate methods for the data assimilation techniques and validating the downscaled values against ground-based observations or higher-resolution datasets will be essential to assess the quality and accuracy of the results.
 
+#### Conclusion
 
 In summary, this report introduces a geographical data science project that aims to downscale VPD and temperature to high-resolution daily values to address vegetation modelling questions. By leveraging several climate datasets with complementing spatial and time resolution and employing simple de-biasing techniques, we can achieve higher spatio-temporal resolution. However, several challenges must be addressed, including data quality, computational requirements, and validation. Various evaluation techniques will assist in assessing the quality of the downscaled data.
